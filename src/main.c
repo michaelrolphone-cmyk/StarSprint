@@ -1,6 +1,7 @@
 #include <snes.h>
 #include "assets.h"
 #include "sprite_format.h"
+#include "game_logic.h"
 
 extern char tilfont, palfont;
 
@@ -41,7 +42,7 @@ extern char tilfont, palfont;
 #define GRAVITY 1
 #define MAX_FALL 12
 #define ROPE_PHASE_COUNT 15
-#define PLAY_SUBSTEPS 2
+#define MAX_PLAY_SUBSTEPS 2
 
 #define POINT_STAR 100
 #define POINT_ENEMY 200
@@ -669,7 +670,7 @@ static void update_ropes(void) {
 static void try_grab_rope(void) {
     u8 i;
     s16 h = player_height();
-    if (player.onRope || player.onGround) return;
+    if (!should_attempt_rope_grab(player.onRope, player.onGround, player.ropeGrabLock)) return;
     for (i = 0; i < MAX_ROPES; i++) {
         if (!ropes[i].active) continue;
         if (overlap(player.x, player.y, PLAYER_W, h, ropes[i].x - 8, ropes[i].y - 8, 16, 16)) {
@@ -1039,6 +1040,15 @@ static void update_bolts(void) {
             }
         }
     }
+}
+
+static u8 count_active_bolts(void) {
+    u8 i;
+    u8 active = 0;
+    for (i = 0; i < MAX_BOLTS; i++) {
+        if (bolts[i].active) active++;
+    }
+    return active;
 }
 
 static void handle_pickups_and_hits(void) {
@@ -1495,13 +1505,17 @@ int main(void) {
             draw_title_screen();
         } else if (gameState == STATE_PLAY) {
             u8 simStep;
+            u8 simSteps = 1;
             if (superActive) {
                 if (superReserveFrames > 0) superReserveFrames--;
                 else superActive = 0;
             }
 
             update_player_input();
-            for (simStep = 0; simStep < PLAY_SUBSTEPS && gameState == STATE_PLAY; simStep++) {
+            if (should_run_secondary_substep(player.vx, player.vy, superActive, count_active_bolts())) {
+                simSteps = MAX_PLAY_SUBSTEPS;
+            }
+            for (simStep = 0; simStep < simSteps && gameState == STATE_PLAY; simStep++) {
                 update_ropes();
                 move_player();
                 update_enemies();
