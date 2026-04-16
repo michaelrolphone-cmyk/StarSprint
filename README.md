@@ -44,8 +44,16 @@ make
 
 The ROM output is `starsprint.sfc`.
 
+## Test command
+
+Run unit tests for gameplay helper logic with:
+
+```sh
+gcc -std=c99 -Wall -Wextra -pedantic tests/test_game_logic.c src/game_logic.c -o tests/test_game_logic
+./tests/test_game_logic
+```
+
 ## Latest tuning notes
 
-- rope release now has a short no-regrab window so you can actually let go
-- rope visuals were changed away from the lightning-bolt look
-- play simulation now advances twice per rendered frame to restore the faster game feel
+- rope release now honors the no-regrab lock window, preventing immediate reattachment on jump release
+- the play loop now enables a second simulation substep only in high-motion moments (super speed, high velocity, or active bolts) to reduce per-frame CPU cost
