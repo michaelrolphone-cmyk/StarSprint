@@ -23,8 +23,8 @@ void convert_interleaved_4bpp_to_snes(const uint8_t *src, uint8_t *dst, size_t b
 
 uint16_t sprite_frame_offset_16x16(uint8_t frameIndex) {
     /*
-     * PVSnesLib's oamSet() expects the character offset in bytes.
-     * A 16x16 sprite frame at 4bpp is 4 tiles * 32 bytes/tile = 128 bytes.
+     * PVSnesLib's oamSet() expects the character offset in 8x8 tile units.
+     * A 16x16 sprite frame is 2x2 tiles, so each frame advances by 4 tiles.
      */
-    return (uint16_t)(frameIndex * 128u);
+    return (uint16_t)(frameIndex * 4u);
 }

@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "../src/sprite_format.h"
-extern const unsigned char sprite_tiles[];
+#include "../src/assets.h"
 
 static void test_single_tile_relayout(void) {
     uint8_t src[32];
@@ -45,16 +45,27 @@ static void test_first_sprite_tile_matches_expected_planes(void) {
 
 static void test_sprite_frame_offset_16x16_layout(void) {
     assert(sprite_frame_offset_16x16(0) == 0);
-    assert(sprite_frame_offset_16x16(1) == 128);
-    assert(sprite_frame_offset_16x16(7) == 896);
-    assert(sprite_frame_offset_16x16(8) == 1024);
-    assert(sprite_frame_offset_16x16(11) == 1408);
-    assert(sprite_frame_offset_16x16(15) == 1920);
+    assert(sprite_frame_offset_16x16(1) == 4);
+    assert(sprite_frame_offset_16x16(7) == 28);
+    assert(sprite_frame_offset_16x16(8) == 32);
+    assert(sprite_frame_offset_16x16(11) == 44);
+    assert(sprite_frame_offset_16x16(15) == 60);
+}
+
+static void test_sprite_offsets_fit_uploaded_tile_buffer(void) {
+    /*
+     * 16 frames * 4 tiles/frame = 64 total tiles.
+     * The uploaded sprite sheet is 2048 bytes => 64 tiles at 32 bytes/tile.
+     */
+    uint16_t finalFrameTileOffset = sprite_frame_offset_16x16(15);
+    size_t bytesConsumedByFrames = ((size_t)finalFrameTileOffset + 4u) * 32u;
+    assert(bytesConsumedByFrames <= SPRITE_TILES_LEN);
 }
 
 int main(void) {
     test_single_tile_relayout();
     test_first_sprite_tile_matches_expected_planes();
     test_sprite_frame_offset_16x16_layout();
+    test_sprite_offsets_fit_uploaded_tile_buffer();
     return 0;
 }
