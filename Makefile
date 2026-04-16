@@ -27,6 +27,7 @@ test:
 	cc -std=c99 -Wall -Wextra -pedantic tests/test_game_logic.c src/game_logic.c -o tests/test_game_logic
 	./tests/test_game_logic
 	./tests/test_bundle_prebuilt.sh
+	./tests/test_console_shim.sh
 
 bundle: all bundle-prebuilt
 
