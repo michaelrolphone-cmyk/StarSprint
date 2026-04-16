@@ -35,23 +35,30 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 
 ## Build
 
-Set `PVSNESLIB_HOME` to your extracted PVSnesLib directory, then run:
+Clone and install PVSnesLib from https://github.com/alekmaul/pvsneslib, set `PVSNESLIB_HOME` to that checkout, then run:
 
 ```sh
 make clean
 make
 make test
+make bundle
 ```
 
 The ROM output is `starsprint.sfc`.
+The bundled ROM output is `dist/starsprint.sfc`.
 
-## Test command
-
-Run unit tests for gameplay helper logic with:
+If you already have `starsprint.sfc`, run this command to package without rebuilding:
 
 ```sh
-gcc -std=c99 -Wall -Wextra -pedantic tests/test_game_logic.c src/game_logic.c -o tests/test_game_logic
-./tests/test_game_logic
+make bundle-prebuilt
+```
+
+## Test commands
+
+Run all unit tests with:
+
+```sh
+make test
 ```
 
 ## Latest tuning notes

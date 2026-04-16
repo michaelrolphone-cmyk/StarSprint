@@ -1,0 +1,4 @@
+dist/*.sfc
+tests/test_game_logic
+tests/test_sprite_format
+*.test-backup
