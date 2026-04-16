@@ -47,7 +47,9 @@ static void test_sprite_frame_offset_16x16_layout(void) {
     assert(sprite_frame_offset_16x16(0) == 0);
     assert(sprite_frame_offset_16x16(1) == 4);
     assert(sprite_frame_offset_16x16(7) == 28);
-    assert(sprite_frame_offset_16x16(8) == 64);
+    assert(sprite_frame_offset_16x16(8) == 32);
+    assert(sprite_frame_offset_16x16(11) == 44);
+    assert(sprite_frame_offset_16x16(15) == 60);
 }
 
 int main(void) {

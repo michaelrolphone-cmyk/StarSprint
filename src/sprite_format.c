@@ -22,5 +22,5 @@ void convert_interleaved_4bpp_to_snes(const uint8_t *src, uint8_t *dst, size_t b
 }
 
 uint16_t sprite_frame_offset_16x16(uint8_t frameIndex) {
-    return (uint16_t)(((frameIndex >> 3) * 64u) + ((frameIndex & 7u) * 4u));
+    return (uint16_t)(frameIndex * 4u);
 }
