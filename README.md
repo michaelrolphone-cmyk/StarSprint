@@ -52,8 +52,8 @@ make test
 make bundle
 ```
 
-The ROM output is `starsprint.sfc`.
-The bundled ROM output is `dist/starsprint.sfc`.
+The ROM output is `starsprint.sfc` (gitignored and not committed).
+The bundled ROM output is `dist/starsprint.sfc` (also gitignored).
 
 If you already have `starsprint.sfc`, run this command to package without rebuilding:
 
