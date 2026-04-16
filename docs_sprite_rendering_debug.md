@@ -15,8 +15,13 @@ Fix broken in-game sprite rendering without repeating failed experiments.
    - Result: User still reports sprites are broken.
    - Why this is considered failed: Tile-index math alone is not the full root cause, so additional rendering pipeline checks are required.
 
-## Working direction
+3. **Header-macro API aliasing for text VRAM functions**
+   - Attempt: Added compatibility `#define` aliases so `consoleSetTextGfxPtr` always rewrote to `consoleSetTextVramBGAdr` and `consoleSetTextMapPtr` to `consoleSetTextVramAdr`.
+   - Result: Sprite rendering remained broken.
+   - Why this is considered failed: `#ifndef` checks macro existence (not function existence), so the rewrite always happened and routed init through the wrong API mapping for the active toolchain, corrupting VRAM layout.
 
-- Upload the packaged sprite tile buffer directly to OAM (`sprite_tiles`) instead of reformatting it at runtime.
-- Keep regression tests focused on sprite frame offset math and data-size bounds.
-- Next debugging step: capture and compare a VRAM/OAM dump from startup to confirm whether corruption is introduced during upload or during per-frame OAM writes.
+## Root cause fixed
+
+- Removed forced preprocessor aliasing for console text VRAM APIs in `src/main.c`.
+- Kept direct calls in `init_video()` (`consoleSetTextGfxPtr` + `consoleSetTextMapPtr`) matching the last-known working code path.
+- Added a regression check to ensure the broken alias block does not return.

@@ -4,16 +4,6 @@
 #include "game_logic.h"
 #include "video_layout.h"
 
-// PVSnesLib 4.5+ renamed these APIs. Keep backward compatibility with
-// older toolchains so the project still builds in both environments.
-#ifndef consoleSetTextGfxPtr
-#define consoleSetTextGfxPtr consoleSetTextVramBGAdr
-#endif
-
-#ifndef consoleSetTextMapPtr
-#define consoleSetTextMapPtr consoleSetTextVramAdr
-#endif
-
 extern char tilfont, palfont;
 
 #define LEVEL_W 192

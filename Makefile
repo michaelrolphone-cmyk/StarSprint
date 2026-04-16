@@ -28,6 +28,7 @@ test:
 	./tests/test_game_logic
 	./tests/test_bundle_prebuilt.sh
 	./tests/test_console_shim.sh
+	./tests/test_sprite_vram_alias_regression.sh
 
 bundle: all bundle-prebuilt
 
