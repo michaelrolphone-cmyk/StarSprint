@@ -1,8 +1,6 @@
 #ifndef STARSPRINT_ASSETS_H
 #define STARSPRINT_ASSETS_H
 
-#include <snes.h>
-
 enum SpriteFrame {
     SPR_PLAYER_SMALL = 0,
     SPR_PLAYER_BIG_TOP,

@@ -40,6 +40,7 @@ Set `PVSNESLIB_HOME` to your extracted PVSnesLib directory, then run:
 ```sh
 make clean
 make
+make test
 ```
 
 The ROM output is `starsprint.sfc`.
