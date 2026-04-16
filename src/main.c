@@ -159,7 +159,9 @@ static u16 superReserveFrames = 0;
 static u8 superActive = 0;
 static u16 cameraX = 0;
 static u16 pad0 = 0;
-static u16 padPrev = 0;
+static u16 pad1 = 0;
+static u16 padInput = 0;
+static u16 padPrevInput = 0;
 static u8 spriteCount = 0;
 static u8 spriteTilesVram[SPRITE_TILES_LEN];
 
@@ -169,6 +171,18 @@ static u8 highestUnlocked = 0;
 static u16 completedBits = 0;
 static u8 gameState = STATE_TITLE;
 static u8 lastState = 255;
+static u8 playerMode = PLAYER_MODE_COOP;
+static u8 activeTurnPlayer = 0;
+
+typedef struct {
+    u16 score;
+    u8 starsTowardMinute;
+    u16 superReserveFrames;
+    u8 big;
+    u8 lightning;
+} PlayerRunState;
+
+static PlayerRunState runState[2];
 
 static const char *worldNames[WORLD_COUNT] = {
     "MEADOW",
@@ -185,6 +199,33 @@ static const u16 uiTextPal[16] = {
 
 static u16 frame_offset(u8 frameIndex) {
     return ((frameIndex >> 3) * 32) + ((frameIndex & 7) * 2);
+}
+
+static void play_sfx(u8 eventId) {
+    (void)sound_for_event(eventId);
+}
+
+static void save_active_run_state(void) {
+    runState[activeTurnPlayer].score = score;
+    runState[activeTurnPlayer].starsTowardMinute = starsTowardMinute;
+    runState[activeTurnPlayer].superReserveFrames = superReserveFrames;
+    runState[activeTurnPlayer].big = player.big;
+    runState[activeTurnPlayer].lightning = player.lightning;
+}
+
+static void load_active_run_state(void) {
+    score = runState[activeTurnPlayer].score;
+    starsTowardMinute = runState[activeTurnPlayer].starsTowardMinute;
+    superReserveFrames = runState[activeTurnPlayer].superReserveFrames;
+    player.big = runState[activeTurnPlayer].big;
+    player.lightning = runState[activeTurnPlayer].lightning;
+}
+
+static void swap_turn_player(void) {
+    save_active_run_state();
+    activeTurnPlayer = next_turn_player(playerMode, activeTurnPlayer, 1);
+    load_active_run_state();
+    play_sfx(SFX_TURN_SWAP);
 }
 
 static void clear_text_screen(void) {
@@ -509,8 +550,12 @@ static void reset_player_position(void) {
 static void begin_level(u8 levelIndex) {
     currentLevel = levelIndex;
     superActive = 0;
-    player.big = 0;
-    player.lightning = 0;
+    if (playerMode == PLAYER_MODE_COOP) {
+        player.big = 0;
+        player.lightning = 0;
+    } else {
+        load_active_run_state();
+    }
     build_level(currentLevel);
     reset_player_position();
     gameState = STATE_PLAY;
@@ -579,6 +624,7 @@ static void break_tile(s16 tx, s16 ty) {
     if (tx >= 0 && tx < LEVEL_W && ty >= 0 && ty < LEVEL_H) {
         levelMap[(u8)ty][(u8)tx] = TILE_EMPTY;
         score += POINT_BLOCK;
+        play_sfx(SFX_HIT);
     }
 }
 
@@ -612,8 +658,12 @@ static u8 overlap(s16 ax, s16 ay, s16 aw, s16 ah, s16 bx, s16 by, s16 bw, s16 bh
 
 static void restart_current_level(void) {
     superActive = 0;
-    player.big = 0;
-    player.lightning = 0;
+    if (playerMode == PLAYER_MODE_COOP) {
+        player.big = 0;
+        player.lightning = 0;
+    } else {
+        swap_turn_player();
+    }
     build_level(currentLevel);
     reset_player_position();
 }
@@ -624,14 +674,17 @@ static void player_take_hit(void) {
     if (player.lightning) {
         player.lightning = 0;
         player.invuln = 60;
+        play_sfx(SFX_HIT);
         return;
     }
     if (player.big) {
         player.big = 0;
         player.invuln = 60;
+        play_sfx(SFX_HIT);
         return;
     }
 
+    play_sfx(SFX_HIT);
     restart_current_level();
 }
 
@@ -697,15 +750,16 @@ static void fire_bolt(void) {
             bolts[i].vy = -2;
             bolts[i].bounces = 3;
             player.cooldown = 16;
+            play_sfx(SFX_FIRE);
             return;
         }
     }
 }
 
 static void update_player_input(void) {
-    u8 jumpPressed = ((pad0 & KEY_B) && !(padPrev & KEY_B));
-    u8 yHeld = (pad0 & KEY_Y) ? 1 : 0;
-    u8 yPressed = ((pad0 & KEY_Y) && !(padPrev & KEY_Y));
+    u8 jumpPressed = ((padInput & KEY_B) && !(padPrevInput & KEY_B));
+    u8 yHeld = (padInput & KEY_Y) ? 1 : 0;
+    u8 yPressed = ((padInput & KEY_Y) && !(padPrevInput & KEY_Y));
     s16 maxSpeed;
 
     superActive = (yHeld && superReserveFrames > 0) ? 1 : 0;
@@ -726,16 +780,17 @@ static void update_player_input(void) {
             player.vy = (dy * 2) - 3;
             if (player.vy < -10) player.vy = -10;
             if (player.vy > 2) player.vy = 2;
+            play_sfx(SFX_JUMP);
         }
         if (yPressed && player.lightning) fire_bolt();
         return;
     }
 
-    if (pad0 & KEY_LEFT) {
+    if (padInput & KEY_LEFT) {
         player.vx--;
         if (player.vx < -maxSpeed) player.vx = -maxSpeed;
         player.facingLeft = 1;
-    } else if (pad0 & KEY_RIGHT) {
+    } else if (padInput & KEY_RIGHT) {
         player.vx++;
         if (player.vx > maxSpeed) player.vx = maxSpeed;
         player.facingLeft = 0;
@@ -747,9 +802,10 @@ static void update_player_input(void) {
     if (jumpPressed && player.onGround) {
         player.vy = JUMP_VELOCITY;
         player.onGround = 0;
+        play_sfx(SFX_JUMP);
     }
 
-    player.smash = (!player.onGround && (pad0 & KEY_DOWN) && player.vy > 0);
+    player.smash = (!player.onGround && (padInput & KEY_DOWN) && player.vy > 0);
 
     if (yPressed && player.lightning) {
         fire_bolt();
@@ -1060,6 +1116,7 @@ static void handle_pickups_and_hits(void) {
             score += POINT_STAR;
             starsTowardMinute++;
             activate_star_reward();
+            play_sfx(SFX_STAR);
         }
     }
 
@@ -1073,6 +1130,7 @@ static void handle_pickups_and_hits(void) {
             }
             powerups[i].active = 0;
             score += 250;
+            play_sfx(SFX_POWERUP);
         }
     }
 
@@ -1083,6 +1141,7 @@ static void handle_pickups_and_hits(void) {
                 enemies[i].active = 0;
                 score += POINT_ENEMY;
                 player.vy = -7;
+                play_sfx(SFX_ENEMY_STOMP);
             } else {
                 player_take_hit();
             }
@@ -1103,6 +1162,8 @@ static void handle_pickups_and_hits(void) {
     }
 
     if (player.x >= LEVEL_GOAL_X) {
+        play_sfx(SFX_LEVEL_CLEAR);
+        if (playerMode == PLAYER_MODE_TURN_BASED) save_active_run_state();
         gameState = STATE_LEVEL_CLEAR;
     }
 }
@@ -1254,6 +1315,12 @@ static void draw_play_hud(void) {
     consoleDrawText(1, 2, "STARS %02u/60", starsTowardMinute);
     consoleDrawText(1, 3, "BOOST %03us %s", reserveSeconds, superActive ? "ON " : "OFF");
     consoleDrawText(1, 4, "FORM  %s", player.lightning ? "LIGHT" : (player.big ? "BIG  " : "SMALL"));
+    consoleDrawText(1, 5, "MODE  %s", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN");
+    if (playerMode == PLAYER_MODE_TURN_BASED) {
+        consoleDrawText(1, 6, "ACTIVE P%u", (u8)(activeTurnPlayer + 1));
+    } else {
+        consoleDrawText(1, 6, "ACTIVE BOTH");
+    }
     consoleDrawText(1, 26, "B JUMP  Y RUN/BOOST/FIRE");
 }
 
@@ -1297,12 +1364,17 @@ static void draw_title_screen(void) {
     consoleDrawText(3, 23, "Y RUNS, USES BOOST, AND FIRES");
     consoleDrawText(4, 24, "DOWN SMASHES BRICKS UNDERFOOT");
     consoleDrawText(4, 25, "COLLECT 60 STARS FOR 1 MIN BOOST");
-    consoleDrawText(6, 26, "PRESS START FOR MAP");
+    consoleDrawText(4, 26, "SELECT TOGGLE MODE: %s", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN");
+    consoleDrawText(6, 27, "PRESS START FOR MAP");
 }
 
 static void update_title_input(void) {
-    u8 startPressed = ((pad0 & KEY_START) && !(padPrev & KEY_START));
-    u8 aPressed = ((pad0 & KEY_A) && !(padPrev & KEY_A));
+    u8 startPressed = ((padInput & KEY_START) && !(padPrevInput & KEY_START));
+    u8 aPressed = ((padInput & KEY_A) && !(padPrevInput & KEY_A));
+    u8 selectPressed = ((padInput & KEY_SELECT) && !(padPrevInput & KEY_SELECT));
+    if (selectPressed) {
+        playerMode = (playerMode == PLAYER_MODE_COOP) ? PLAYER_MODE_TURN_BASED : PLAYER_MODE_COOP;
+    }
     if (startPressed || aPressed) {
         gameState = STATE_WORLD_MAP;
         selectedLevel = highestUnlocked;
@@ -1349,7 +1421,7 @@ static void draw_world_map(void) {
     consoleDrawText(2, 1, "STARSPRINT WORLD MAP");
     consoleDrawText(2, 2, "D-PAD MOVE  START/A PLAY");
     consoleDrawText(2, 3, "CLEAR LEVELS TO UNLOCK MORE");
-    consoleDrawText(2, 4, "BOOST BANK %03us", (u16)(superReserveFrames / 60));
+    consoleDrawText(2, 4, "MODE %s  BOOST %03us", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN", (u16)(superReserveFrames / 60));
 
     for (row = 0; row < WORLD_COUNT; row++) {
         u8 y = 7 + row * 6;
@@ -1403,18 +1475,21 @@ static void commit_level_clear(void) {
     } else {
         gameState = STATE_WORLD_MAP;
     }
+    if (playerMode == PLAYER_MODE_TURN_BASED) {
+        activeTurnPlayer = next_turn_player(playerMode, activeTurnPlayer, 1);
+    }
 }
 
 static void update_world_map_input(void) {
     u8 row = selectedLevel / LEVELS_PER_WORLD;
     u8 col = selectedLevel % LEVELS_PER_WORLD;
     u8 newIndex = selectedLevel;
-    u8 startPressed = ((pad0 & KEY_START) && !(padPrev & KEY_START));
-    u8 aPressed = ((pad0 & KEY_A) && !(padPrev & KEY_A));
-    u8 leftPressed = ((pad0 & KEY_LEFT) && !(padPrev & KEY_LEFT));
-    u8 rightPressed = ((pad0 & KEY_RIGHT) && !(padPrev & KEY_RIGHT));
-    u8 upPressed = ((pad0 & KEY_UP) && !(padPrev & KEY_UP));
-    u8 downPressed = ((pad0 & KEY_DOWN) && !(padPrev & KEY_DOWN));
+    u8 startPressed = ((padInput & KEY_START) && !(padPrevInput & KEY_START));
+    u8 aPressed = ((padInput & KEY_A) && !(padPrevInput & KEY_A));
+    u8 leftPressed = ((padInput & KEY_LEFT) && !(padPrevInput & KEY_LEFT));
+    u8 rightPressed = ((padInput & KEY_RIGHT) && !(padPrevInput & KEY_RIGHT));
+    u8 upPressed = ((padInput & KEY_UP) && !(padPrevInput & KEY_UP));
+    u8 downPressed = ((padInput & KEY_DOWN) && !(padPrevInput & KEY_DOWN));
 
     if (leftPressed && col > 0) newIndex = selectedLevel - 1;
     if (rightPressed && col + 1 < LEVELS_PER_WORLD) newIndex = selectedLevel + 1;
@@ -1429,16 +1504,16 @@ static void update_world_map_input(void) {
 }
 
 static void update_level_clear_input(void) {
-    u8 startPressed = ((pad0 & KEY_START) && !(padPrev & KEY_START));
-    u8 aPressed = ((pad0 & KEY_A) && !(padPrev & KEY_A));
+    u8 startPressed = ((padInput & KEY_START) && !(padPrevInput & KEY_START));
+    u8 aPressed = ((padInput & KEY_A) && !(padPrevInput & KEY_A));
     if (startPressed || aPressed) {
         commit_level_clear();
     }
 }
 
 static void update_all_clear_input(void) {
-    u8 startPressed = ((pad0 & KEY_START) && !(padPrev & KEY_START));
-    u8 aPressed = ((pad0 & KEY_A) && !(padPrev & KEY_A));
+    u8 startPressed = ((padInput & KEY_START) && !(padPrevInput & KEY_START));
+    u8 aPressed = ((padInput & KEY_A) && !(padPrevInput & KEY_A));
     if (startPressed || aPressed) {
         selectedLevel = highestUnlocked;
         gameState = STATE_WORLD_MAP;
@@ -1481,14 +1556,24 @@ static void init_video(void) {
 }
 
 int main(void) {
+    u8 i;
     init_video();
     reset_player_position();
     player.big = 0;
     player.lightning = 0;
+    for (i = 0; i < 2; i++) {
+        runState[i].score = 0;
+        runState[i].starsTowardMinute = 0;
+        runState[i].superReserveFrames = 0;
+        runState[i].big = 0;
+        runState[i].lightning = 0;
+    }
 
     while (1) {
-        padPrev = pad0;
+        padPrevInput = padInput;
         pad0 = padsCurrent(0);
+        pad1 = padsCurrent(1);
+        padInput = merge_coop_input(pad0, pad1, playerMode, activeTurnPlayer);
 
         if (gameState != lastState) {
             clear_text_screen();

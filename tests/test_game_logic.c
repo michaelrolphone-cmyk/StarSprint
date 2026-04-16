@@ -3,6 +3,10 @@
 
 #include "../src/game_logic.h"
 
+#define KEY_LEFT 0x0040
+#define KEY_RIGHT 0x0080
+#define KEY_START 0x1000
+
 static void test_should_attempt_rope_grab(void) {
     assert(should_attempt_rope_grab(0, 0, 0) == 1);
     assert(should_attempt_rope_grab(1, 0, 0) == 0);
@@ -18,9 +22,31 @@ static void test_should_run_secondary_substep(void) {
     assert(should_run_secondary_substep(0, 0, 0, 1) == 1);
 }
 
+static void test_merge_coop_input(void) {
+    assert(merge_coop_input(KEY_LEFT, KEY_RIGHT, PLAYER_MODE_COOP, 0) == (KEY_LEFT | KEY_RIGHT));
+    assert(merge_coop_input(KEY_LEFT, KEY_RIGHT, PLAYER_MODE_TURN_BASED, 0) == KEY_LEFT);
+    assert(merge_coop_input(KEY_LEFT, KEY_RIGHT, PLAYER_MODE_TURN_BASED, 1) == KEY_RIGHT);
+}
+
+static void test_next_turn_player(void) {
+    assert(next_turn_player(PLAYER_MODE_COOP, 1, 1) == 0);
+    assert(next_turn_player(PLAYER_MODE_TURN_BASED, 0, 0) == 0);
+    assert(next_turn_player(PLAYER_MODE_TURN_BASED, 0, 1) == 1);
+    assert(next_turn_player(PLAYER_MODE_TURN_BASED, 1, 1) == 0);
+}
+
+static void test_sound_for_event(void) {
+    assert(sound_for_event(SFX_JUMP) == SFX_JUMP);
+    assert(sound_for_event(SFX_TURN_SWAP) == SFX_TURN_SWAP);
+    assert(sound_for_event(99) == SFX_NONE);
+}
+
 int main(void) {
     test_should_attempt_rope_grab();
     test_should_run_secondary_substep();
+    test_merge_coop_input();
+    test_next_turn_player();
+    test_sound_for_event();
     puts("test_game_logic: ok");
     return 0;
 }

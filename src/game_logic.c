@@ -14,3 +14,19 @@ uint8_t should_run_secondary_substep(int16_t playerVx, int16_t playerVy, uint8_t
     if (absVy >= 8) return 1;
     return 0;
 }
+
+uint16_t merge_coop_input(uint16_t pad0, uint16_t pad1, uint8_t mode, uint8_t activeTurnPlayer) {
+    if (mode == PLAYER_MODE_COOP) return (uint16_t)(pad0 | pad1);
+    return activeTurnPlayer ? pad1 : pad0;
+}
+
+uint8_t next_turn_player(uint8_t mode, uint8_t activeTurnPlayer, uint8_t swapRequested) {
+    if (mode != PLAYER_MODE_TURN_BASED) return 0;
+    if (!swapRequested) return activeTurnPlayer;
+    return activeTurnPlayer ? 0 : 1;
+}
+
+uint8_t sound_for_event(uint8_t eventId) {
+    if (eventId > SFX_TURN_SWAP) return SFX_NONE;
+    return eventId;
+}

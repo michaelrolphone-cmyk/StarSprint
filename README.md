@@ -7,6 +7,8 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 - 3 worlds
 - 4 levels per world
 - title screen plus interactive world map with level selection and progression
+- 2-player support with cooperative and turn-based modes
+- contextual sound-effect event hooks for movement, combat, pickups, and turn swaps
 - hidden grow and lightning powerups
 - smiley gold stars for score and boost banking
 - 60 stars = 1 minute of banked super speed
@@ -19,6 +21,7 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 ## Controls
 
 ### Title screen
+- Select: toggle 2-player mode (Co-op / Turn-based)
 - Start or A: go to the world map
 
 ### World map
@@ -26,6 +29,8 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 - A or Start: enter selected level
 
 ### In level
+- Co-op mode: both controllers can control the same active hero at the same time
+- Turn-based mode: controller 1 controls Player 1 turns, controller 2 controls Player 2 turns
 - Left / Right: move
 - B: jump / release from a rope swing
 - Hold Y: run faster
@@ -65,3 +70,6 @@ make test
 
 - rope release now honors the no-regrab lock window, preventing immediate reattachment on jump release
 - the play loop now enables a second simulation substep only in high-motion moments (super speed, high velocity, or active bolts) to reduce per-frame CPU cost
+- co-op now merges controller input for shared movement while turn-based mode routes controls to the active player
+- turn-based mode persists each player's score/form/boost state and swaps players on wipe or level clear
+- gameplay events now trigger sound-effect IDs through a dedicated event mapping layer
