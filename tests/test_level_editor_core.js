@@ -18,6 +18,14 @@ test('level editor is standalone HTML with inline assets only', () => {
   assert.equal(externalStylesheetLinks.length, 0, 'expected no external stylesheet links');
 });
 
+
+test('editor UI includes asset palette and rendered preview canvas', () => {
+  assert.match(html, /id="assetPalette"/);
+  assert.match(html, /id="renderCanvas"/);
+  assert.match(html, /var ASSETS = \[/);
+  assert.match(html, /name: 'Ground Block'/);
+});
+
 test('normalizeLevel applies defaults and clamps spawn', () => {
   const level = core.normalizeLevel({
     id: ' demo ',

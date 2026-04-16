@@ -64,7 +64,7 @@ make bundle-prebuilt
 
 ## Standalone level editor
 
-A dependency-free single-file browser level editor is included at `level-editor/index.html`.
+A dependency-free single-file browser level editor is included at `level-editor/index.html`, with an asset palette and a rendered preview you can paint directly.
 
 ### Level file folder
 
@@ -81,7 +81,7 @@ python3 -m http.server 8000
 # then open http://localhost:8000/level-editor/
 ```
 
-Use **Export JSON** to download a level file, then move it into `level-editor/levels/` and add the filename to `level-editor/levels/index.json`.
+Use the **Asset Palette** to pick tiles, paint either the map editor grid or rendered preview canvas, then use **Export JSON** to download a level file and move it into `level-editor/levels/` (add the filename to `level-editor/levels/index.json`).
 
 ## Test commands
 

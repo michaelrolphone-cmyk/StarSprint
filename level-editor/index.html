@@ -7,28 +7,38 @@
     <style>
       :root { color-scheme: dark; font-family: Arial, sans-serif; }
       body { margin: 0; background: #0b1020; color: #f4f6ff; }
-      main { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+      main { max-width: 1320px; margin: 0 auto; padding: 1rem; }
       h1 { margin-top: 0; }
       .hint { color: #b8c2ff; }
       .toolbar { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-bottom: .75rem; }
       .toolbar label { display: inline-flex; gap: .4rem; align-items: center; }
       input, select, button, textarea { background: #131b34; color: inherit; border: 1px solid #36436f; border-radius: 4px; padding: .35rem .5rem; }
       button { cursor: pointer; }
-      .workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-      .grid { display: grid; gap: 2px; align-content: start; overflow: auto; max-height: 70vh; }
-      .cell { width: 28px; height: 28px; font-size: .75rem; padding: 0; }
-      .cell.spawn { border-color: #2dff9f; box-shadow: 0 0 0 1px #2dff9f inset; }
-      .json-pane { display: grid; gap: .5rem; }
-      #jsonEditor { min-height: 70vh; width: 100%; font-family: 'Courier New', monospace; resize: vertical; }
+      .layout { display: grid; grid-template-columns: 320px 1fr; gap: 1rem; }
+      .side-panel { background: #101733; border: 1px solid #2a355f; border-radius: 6px; padding: .75rem; align-self: start; }
+      .palette { display: grid; gap: .5rem; }
+      .asset-btn { display: flex; align-items: center; gap: .5rem; justify-content: flex-start; width: 100%; }
+      .asset-btn.active { outline: 2px solid #8ca3ff; }
+      .swatch { width: 18px; height: 18px; border-radius: 3px; border: 1px solid #0a0f20; }
+      .workspace { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr); gap: 1rem; }
+      .card { background: #101733; border: 1px solid #2a355f; border-radius: 6px; padding: .75rem; }
+      .card h2 { margin: 0 0 .5rem; font-size: 1rem; }
+      .grid { display: grid; gap: 2px; align-content: start; overflow: auto; max-height: 62vh; }
+      .cell { width: 28px; height: 28px; padding: 0; border: 1px solid #121b38; font-size: .8rem; }
+      .cell.spawn { box-shadow: 0 0 0 2px #2dff9f inset; }
+      .preview-wrap { overflow: auto; }
+      #renderCanvas { background: #050913; border: 1px solid #2f3d71; image-rendering: pixelated; display: block; }
+      .json-pane { display: grid; gap: .5rem; margin-top: .75rem; }
+      #jsonEditor { min-height: 34vh; width: 100%; font-family: 'Courier New', monospace; resize: vertical; }
       #status.ok { color: #95ffa8; }
       #status.error { color: #ff8f8f; }
-      @media (max-width: 960px) { .workspace { grid-template-columns: 1fr; } }
+      @media (max-width: 1120px) { .layout { grid-template-columns: 1fr; } .workspace { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
     <main>
       <h1>StarSprint Level Editor</h1>
-      <p class="hint">Single-file app (no external dependencies). Edit JSON files in <code>level-editor/levels/</code>.</p>
+      <p class="hint">Single-file app (no external dependencies). Pick an asset from the palette, paint the map, and edit JSON files in <code>level-editor/levels/</code>.</p>
 
       <section class="toolbar">
         <label>Level file <select id="levelSelect"></select></label>
@@ -36,40 +46,49 @@
         <label>Width <input id="widthInput" type="number" min="1" value="16" /></label>
         <label>Height <input id="heightInput" type="number" min="1" value="12" /></label>
         <button id="resizeBtn" type="button">Resize</button>
-      </section>
-
-      <section class="toolbar">
-        <label>Tile value <input id="tilePicker" type="number" min="0" step="1" value="1" /></label>
-        <label><input id="spawnMode" type="checkbox" /> Place spawn point instead of tiles</label>
+        <label><input id="spawnMode" type="checkbox" /> Place spawn point</label>
         <button id="importBtn" type="button">Import JSON</button>
         <button id="exportBtn" type="button">Export JSON</button>
       </section>
 
       <p id="status" class="ok">Loading levels...</p>
 
-      <section class="workspace">
-        <div id="gridHost" class="grid" aria-label="Tile grid"></div>
-        <label class="json-pane">Level JSON<textarea id="jsonEditor" spellcheck="false"></textarea></label>
+      <section class="layout">
+        <aside class="side-panel">
+          <h2>Asset Palette</h2>
+          <p>Select an asset and click in the map editor or rendered view.</p>
+          <div id="assetPalette" class="palette" aria-label="Asset palette"></div>
+        </aside>
+
+        <section class="workspace">
+          <article class="card">
+            <h2>Map Editor</h2>
+            <div id="gridHost" class="grid" aria-label="Editable tile grid"></div>
+          </article>
+          <article class="card">
+            <h2>Rendered Preview</h2>
+            <div class="preview-wrap">
+              <canvas id="renderCanvas" width="512" height="384" aria-label="Rendered level preview"></canvas>
+            </div>
+          </article>
+        </section>
       </section>
+
+      <label class="json-pane">Level JSON<textarea id="jsonEditor" spellcheck="false"></textarea></label>
     </main>
 
     <script id="level-editor-core">
       (function (globalScope) {
         'use strict';
-
         var DEFAULT_TILE = 0;
 
-        function deepClone(value) {
-          return JSON.parse(JSON.stringify(value));
-        }
+        function deepClone(value) { return JSON.parse(JSON.stringify(value)); }
 
         function createGrid(width, height, fill) {
           var grid = [];
           for (var y = 0; y < height; y += 1) {
             var row = [];
-            for (var x = 0; x < width; x += 1) {
-              row.push(fill);
-            }
+            for (var x = 0; x < width; x += 1) row.push(fill);
             grid.push(row);
           }
           return grid;
@@ -81,13 +100,11 @@
           var width = Number.isInteger(level.width) && level.width > 0 ? level.width : 16;
           var height = Number.isInteger(level.height) && level.height > 0 ? level.height : 12;
           var spawn = level.spawn || {};
-
           var tiles = createGrid(width, height, DEFAULT_TILE);
+
           if (Array.isArray(level.tiles)) {
             for (var y = 0; y < height; y += 1) {
-              if (!Array.isArray(level.tiles[y])) {
-                continue;
-              }
+              if (!Array.isArray(level.tiles[y])) continue;
               for (var x = 0; x < width; x += 1) {
                 var candidate = level.tiles[y][x];
                 tiles[y][x] = Number.isInteger(candidate) && candidate >= 0 ? candidate : DEFAULT_TILE;
@@ -129,11 +146,7 @@
           return true;
         }
 
-        function serializeLevel(level) {
-          validateLevel(level);
-          return JSON.stringify(level, null, 2) + '\n';
-        }
-
+        function serializeLevel(level) { validateLevel(level); return JSON.stringify(level, null, 2) + '\n'; }
         function parseLevel(text) {
           var parsed = JSON.parse(text);
           var normalized = normalizeLevel(parsed);
@@ -141,20 +154,24 @@
           return normalized;
         }
 
-        globalScope.LevelEditorCore = {
-          DEFAULT_TILE: DEFAULT_TILE,
-          createGrid: createGrid,
-          normalizeLevel: normalizeLevel,
-          validateLevel: validateLevel,
-          serializeLevel: serializeLevel,
-          parseLevel: parseLevel
-        };
+        globalScope.LevelEditorCore = { DEFAULT_TILE: DEFAULT_TILE, createGrid: createGrid, normalizeLevel: normalizeLevel, validateLevel: validateLevel, serializeLevel: serializeLevel, parseLevel: parseLevel };
       })(typeof window !== 'undefined' ? window : globalThis);
     </script>
 
     <script id="level-editor-app">
       (function () {
         'use strict';
+
+        var TILE_SIZE = 24;
+        var ASSETS = [
+          { id: 0, name: 'Empty Sky', swatch: '#0a122a', glyph: '' },
+          { id: 1, name: 'Ground Block', swatch: '#8d5a2b', glyph: '█' },
+          { id: 2, name: 'Cloud Platform', swatch: '#b9cbff', glyph: '☁' },
+          { id: 3, name: 'Breakable Brick', swatch: '#c87d48', glyph: '▦' },
+          { id: 4, name: 'Coin Star', swatch: '#ffd94d', glyph: '★' },
+          { id: 5, name: 'Hazard', swatch: '#ff5f67', glyph: '▲' },
+          { id: 6, name: 'Rope Anchor', swatch: '#38d2c7', glyph: '⌇' }
+        ];
 
         var core = window.LevelEditorCore;
         var dom = {
@@ -163,20 +180,44 @@
           widthInput: document.getElementById('widthInput'),
           heightInput: document.getElementById('heightInput'),
           resizeBtn: document.getElementById('resizeBtn'),
-          tilePicker: document.getElementById('tilePicker'),
           spawnMode: document.getElementById('spawnMode'),
           gridHost: document.getElementById('gridHost'),
+          renderCanvas: document.getElementById('renderCanvas'),
+          assetPalette: document.getElementById('assetPalette'),
           jsonEditor: document.getElementById('jsonEditor'),
           importBtn: document.getElementById('importBtn'),
           exportBtn: document.getElementById('exportBtn'),
           status: document.getElementById('status')
         };
 
-        var appState = { manifest: [], activeLevelFile: '', level: null };
+        var ctx = dom.renderCanvas.getContext('2d');
+        var appState = { manifest: [], activeLevelFile: '', level: null, activeAssetId: 1 };
+
+        function getAsset(id) {
+          for (var i = 0; i < ASSETS.length; i += 1) {
+            if (ASSETS[i].id === id) return ASSETS[i];
+          }
+          return ASSETS[0];
+        }
 
         function setStatus(message, isError) {
           dom.status.textContent = message;
           dom.status.className = isError ? 'error' : 'ok';
+        }
+
+        function renderPalette() {
+          dom.assetPalette.innerHTML = '';
+          ASSETS.forEach(function (asset) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'asset-btn' + (asset.id === appState.activeAssetId ? ' active' : '');
+            btn.innerHTML = '<span class="swatch" style="background:' + asset.swatch + '"></span>' + asset.name + ' (id ' + asset.id + ')';
+            btn.addEventListener('click', function () {
+              appState.activeAssetId = asset.id;
+              renderPalette();
+            });
+            dom.assetPalette.appendChild(btn);
+          });
         }
 
         function populateLevelSelect() {
@@ -194,11 +235,14 @@
           dom.gridHost.style.gridTemplateColumns = 'repeat(' + appState.level.width + ', 28px)';
           for (var y = 0; y < appState.level.height; y += 1) {
             for (var x = 0; x < appState.level.width; x += 1) {
+              var tileId = appState.level.tiles[y][x];
+              var asset = getAsset(tileId);
               var btn = document.createElement('button');
               btn.type = 'button';
               btn.className = 'cell';
-              btn.textContent = String(appState.level.tiles[y][x]);
-              btn.title = 'x=' + x + ', y=' + y;
+              btn.textContent = asset.glyph || ' ';
+              btn.title = asset.name + ' (x=' + x + ', y=' + y + ')';
+              btn.style.background = asset.swatch;
               if (appState.level.spawn.x === x && appState.level.spawn.y === y) btn.classList.add('spawn');
               btn.addEventListener('click', paintCell.bind(null, x, y));
               dom.gridHost.appendChild(btn);
@@ -206,12 +250,46 @@
           }
         }
 
+        function renderPreview() {
+          var widthPx = appState.level.width * TILE_SIZE;
+          var heightPx = appState.level.height * TILE_SIZE;
+          dom.renderCanvas.width = widthPx;
+          dom.renderCanvas.height = heightPx;
+          ctx.clearRect(0, 0, widthPx, heightPx);
+
+          for (var y = 0; y < appState.level.height; y += 1) {
+            for (var x = 0; x < appState.level.width; x += 1) {
+              var tileId = appState.level.tiles[y][x];
+              var asset = getAsset(tileId);
+              var px = x * TILE_SIZE;
+              var py = y * TILE_SIZE;
+
+              ctx.fillStyle = asset.swatch;
+              ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+              ctx.strokeStyle = '#111830';
+              ctx.strokeRect(px + 0.5, py + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+
+              if (asset.glyph) {
+                ctx.fillStyle = '#0a1024';
+                ctx.font = '14px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(asset.glyph, px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+              }
+            }
+          }
+
+          ctx.strokeStyle = '#2dff9f';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(appState.level.spawn.x * TILE_SIZE + 1, appState.level.spawn.y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        }
+
         function renderJson() { dom.jsonEditor.value = core.serializeLevel(appState.level); }
         function syncInputs() {
           dom.widthInput.value = String(appState.level.width);
           dom.heightInput.value = String(appState.level.height);
         }
-        function renderAll() { renderGrid(); renderJson(); syncInputs(); }
+        function renderAll() { renderPalette(); renderGrid(); renderPreview(); renderJson(); syncInputs(); }
 
         function createNewLevel() {
           appState.level = core.normalizeLevel({ id: 'new-level', name: 'New Level', width: 16, height: 12, spawn: { x: 0, y: 0 } });
@@ -255,18 +333,23 @@
             appState.level.spawn.x = x;
             appState.level.spawn.y = y;
             renderGrid();
+            renderPreview();
             renderJson();
             setStatus('Set spawn to (' + x + ', ' + y + ').');
             return;
           }
-          var tileValue = parseInt(dom.tilePicker.value, 10);
-          if (!Number.isInteger(tileValue) || tileValue < 0) {
-            setStatus('Tile value must be a non-negative integer.', true);
-            return;
-          }
-          appState.level.tiles[y][x] = tileValue;
+          appState.level.tiles[y][x] = appState.activeAssetId;
           renderGrid();
+          renderPreview();
           renderJson();
+        }
+
+        function handleCanvasPaint(event) {
+          var rect = dom.renderCanvas.getBoundingClientRect();
+          var x = Math.floor((event.clientX - rect.left) / TILE_SIZE);
+          var y = Math.floor((event.clientY - rect.top) / TILE_SIZE);
+          if (x < 0 || y < 0 || x >= appState.level.width || y >= appState.level.height) return;
+          paintCell(x, y);
         }
 
         function resizeLevel(newWidth, newHeight) {
@@ -287,6 +370,7 @@
           try {
             appState.level = core.parseLevel(dom.jsonEditor.value);
             renderGrid();
+            renderPreview();
             syncInputs();
             setStatus('Imported JSON into the editor state.');
           } catch (err) {
@@ -312,9 +396,7 @@
           }
         }
 
-        dom.levelSelect.addEventListener('change', function () {
-          loadLevelFile(dom.levelSelect.value).catch(function (err) { setStatus(err.message, true); });
-        });
+        dom.levelSelect.addEventListener('change', function () { loadLevelFile(dom.levelSelect.value).catch(function (err) { setStatus(err.message, true); }); });
         dom.newLevelBtn.addEventListener('click', createNewLevel);
         dom.resizeBtn.addEventListener('click', function () {
           var width = parseInt(dom.widthInput.value, 10);
@@ -327,6 +409,7 @@
         });
         dom.importBtn.addEventListener('click', importFromJson);
         dom.exportBtn.addEventListener('click', exportJson);
+        dom.renderCanvas.addEventListener('click', handleCanvasPaint);
 
         loadManifest().catch(function (err) {
           createNewLevel();
