@@ -25,3 +25,5 @@ Fix broken in-game sprite rendering without repeating failed experiments.
 - Removed forced preprocessor aliasing for console text VRAM APIs in `src/main.c`.
 - Kept direct calls in `init_video()` (`consoleSetTextGfxPtr` + `consoleSetTextMapPtr`) matching the last-known working code path.
 - Added a regression check to ensure the broken alias block does not return.
+- Restored explicit sprite-tile lane conversion before OAM upload and upload from the converted buffer.
+- Restored linear frame addressing (`frameIndex * 4`) so each 16x16 frame maps to its contiguous 2x2 tile block.

@@ -169,6 +169,7 @@ static u16 pad1 = 0;
 static u16 padInput = 0;
 static u16 padPrevInput = 0;
 static u8 spriteCount = 0;
+static u8 spriteTilesVram[SPRITE_TILES_LEN];
 
 static u8 currentLevel = 0;
 static u8 selectedLevel = 0;
@@ -1654,7 +1655,8 @@ static void init_video(void) {
     bgSetDisable(1);
     bgSetDisable(2);
 
-    oamInitGfxSet((u8 *)sprite_tiles, SPRITE_TILES_LEN, (u8 *)sprite_pal, SPRITE_PAL_LEN, 0, 0x0000, OBJ_SIZE16_L32);
+    convert_interleaved_4bpp_to_snes(sprite_tiles, spriteTilesVram, SPRITE_TILES_LEN);
+    oamInitGfxSet((u8 *)spriteTilesVram, SPRITE_TILES_LEN, (u8 *)sprite_pal, SPRITE_PAL_LEN, 0, 0x0000, OBJ_SIZE16_L32);
 
     bgSetScroll(0, 0, 0);
     set_backdrop_for_state(STATE_TITLE);
