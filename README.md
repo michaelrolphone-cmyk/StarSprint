@@ -71,6 +71,10 @@ make test
 
 ## Latest tuning notes
 
+- title, world-map, and clear-state UI now use themed palettes to better match the cover-art color treatment
+- title and world-map scenes now stage sprites in a cover-inspired layout (hero centerpiece, star arc, rocket trail, and decorative pickups)
+- sprite palette was retuned for stronger saturated contrast to better reflect the uploaded art direction
+- level generation now adds cover-style setpieces (star arches, suspended metallic cloud routes, and extra elevated platform beats) to better match the requested in-level look
 - rope release now honors the no-regrab lock window, preventing immediate reattachment on jump release
 - the play loop now enables a second simulation substep only in high-motion moments (super speed, high velocity, or active bolts) to reduce per-frame CPU cost
 - co-op now merges controller input for shared movement while turn-based mode routes controls to the active player

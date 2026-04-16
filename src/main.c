@@ -198,10 +198,35 @@ static const char *worldNames[WORLD_COUNT] = {
 
 static const s16 ropeSwingX[ROPE_PHASE_COUNT] = { -44, -38, -31, -24, -17, -11, -6, 0, 6, 11, 17, 24, 31, 38, 44 };
 static const s16 ropeSwingY[ROPE_PHASE_COUNT] = { 22, 16, 11, 7, 4, 2, 1, 0, 1, 2, 4, 7, 11, 16, 22 };
-static const u16 uiTextPal[16] = {
+static const u16 uiTextPalTitle[16] = {
+    0x0000, 0x7FFF, 0x739F, 0x631F, 0x031F, 0x015A, 0x01DF, 0x02BF,
+    0x03BF, 0x03DF, 0x1FFF, 0x4A7F, 0x7E00, 0x7F00, 0x5A00, 0x2D60
+};
+static const u16 uiTextPalMap[16] = {
+    0x0000, 0x7FFF, 0x6F7F, 0x5EDF, 0x45DF, 0x34DF, 0x2FFF, 0x1FFF,
+    0x17FF, 0x0FFF, 0x077F, 0x7F00, 0x6A40, 0x55A0, 0x3CC0, 0x1C00
+};
+static const u16 uiTextPalPlay[16] = {
     0x0000, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF,
     0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF
 };
+static const u16 uiTextPalClear[16] = {
+    0x0000, 0x7FFF, 0x7BFF, 0x5FFF, 0x47FF, 0x2BFF, 0x13FF, 0x03FF,
+    0x03DF, 0x2FFF, 0x4FFF, 0x6BFF, 0x7E00, 0x6D00, 0x5400, 0x2A00
+};
+
+static const u16 *ui_palette_for_theme(u8 theme) {
+    if (theme == UI_THEME_TITLE) return uiTextPalTitle;
+    if (theme == UI_THEME_MAP) return uiTextPalMap;
+    if (theme == UI_THEME_PLAY) return uiTextPalPlay;
+    return uiTextPalClear;
+}
+
+static void apply_ui_theme(u8 state) {
+    u8 theme = ui_theme_for_state(state);
+    const u16 *pal = ui_palette_for_theme(theme);
+    consoleSetTextPal(0, (u8 *)pal, 32);
+}
 
 static void play_sfx(u8 eventId) {
     (void)sound_for_event(eventId);
@@ -413,6 +438,10 @@ static void add_brick_strip(s16 tx0, s16 tx1, s16 ty) {
     set_span(tx0, tx1, ty, TILE_BRICK);
 }
 
+static void add_used_strip(s16 tx0, s16 tx1, s16 ty) {
+    set_span(tx0, tx1, ty, TILE_USED);
+}
+
 static void add_hidden_power(s16 tx, s16 ty, u8 type) {
     if (type == POWER_GROW) {
         set_tile(tx, ty, TILE_POWER_GROW);
@@ -506,6 +535,25 @@ static void build_level(u8 levelIndex) {
         if ((i + stage) & 1) add_enemy(ENEMY_WALK, tx + 1, 10 - (i & 1), -1);
     }
 
+    for (i = 0; i < 4; i++) {
+        s16 arcCenter = 24 + i * 42 + (level_style_seed(levelIndex, i) % 10);
+        s16 arcY = 7 + (i & 1);
+        if (arcCenter >= LEVEL_W - 22) continue;
+        add_star_arch(arcCenter - 5, arcCenter + 5, arcY);
+        add_ground_platform(arcCenter - 1, arcCenter + 1, arcY + 2);
+    }
+
+    for (i = 0; i < 3; i++) {
+        s16 cloudBase = 34 + i * 46 + (level_style_seed(levelIndex, i + 9) % 12);
+        s16 cloudY = 6 + (i % 2);
+        if (cloudBase >= LEVEL_W - 28) continue;
+        add_used_strip(cloudBase, cloudBase + 4, cloudY);
+        add_star_line(cloudBase, cloudBase + 4, cloudY - 1);
+        if (i == 1) {
+            add_spike_strip(cloudBase + 1, cloudBase + 2);
+        }
+    }
+
     if (world == 0) {
         add_brick_strip(14, 18, 9);
         add_hidden_power(16, 9, POWER_GROW);
@@ -531,6 +579,7 @@ static void build_level(u8 levelIndex) {
     add_stairs(LEVEL_W - 18, 5, 1);
     add_stairs(LEVEL_W - 8, 4, -1);
     add_star_line(LEVEL_W - 18, LEVEL_W - 10, 6 - world);
+    add_used_strip(LEVEL_W - 32, LEVEL_W - 20, 8);
 
     if (levelIndex == 0) {
         set_span(43, 47, 8, TILE_EMPTY);
@@ -1364,47 +1413,57 @@ static void draw_play_hud(void) {
 }
 
 static void draw_title_scene(void) {
+    static const s16 rainbowX[9] = { 34, 54, 74, 94, 114, 134, 154, 174, 194 };
+    static const s16 rainbowY[9] = { 86, 74, 66, 58, 56, 58, 66, 74, 86 };
     s16 x;
+    u8 i;
 
     for (x = 0; x < 16; x++) {
         sprite_emit(SPR_GROUND, x * 16, 192, 0, 0);
     }
 
-    sprite_emit(SPR_GROUND, 12, 150, 0, 0);
-    sprite_emit(SPR_GROUND, 28, 150, 0, 0);
-    sprite_emit(SPR_GROUND, 188, 150, 0, 0);
-    sprite_emit(SPR_GROUND, 204, 150, 0, 0);
+    sprite_emit(SPR_GROUND, 8, 156, 0, 0);
+    sprite_emit(SPR_GROUND, 24, 156, 0, 0);
+    sprite_emit(SPR_GROUND, 200, 152, 0, 0);
+    sprite_emit(SPR_GROUND, 216, 152, 0, 0);
+    sprite_emit(SPR_BRICK, 78, 152, 0, 0);
+    sprite_emit(SPR_BRICK, 94, 152, 0, 0);
+    sprite_emit(SPR_BRICK, 110, 152, 0, 0);
+    sprite_emit(SPR_BRICK, 126, 152, 0, 0);
 
-    sprite_emit(SPR_PLAYER_BIG_TOP, 104, 100, 0, 0);
-    sprite_emit(SPR_PLAYER_BIG_BOTTOM, 104, 116, 0, 0);
+    sprite_emit(SPR_PLAYER_BIG_TOP, 104, 98, 0, 0);
+    sprite_emit(SPR_PLAYER_BIG_BOTTOM, 104, 114, 0, 0);
+    sprite_emit(SPR_GROW_POWER, 52, 118, 0, 0);
+    sprite_emit(SPR_ENEMY_WALKER, 182, 122, 1, 0);
+    sprite_emit(SPR_ENEMY_HOPPER, 36, 162, 0, 0);
 
-    sprite_emit(SPR_GROW_POWER, 32, 112, 0, 0);
-    sprite_emit(SPR_ENEMY_HOPPER, 68, 156, 0, 0);
-    sprite_emit(SPR_ENEMY_WALKER, 182, 146, 1, 0);
-    sprite_emit(SPR_TITLE_ROCKET, 208, 28, 0, 0);
+    for (i = 0; i < 9; i++) {
+        sprite_emit(SPR_STAR_SMILE, rainbowX[i], rainbowY[i], 0, 0);
+    }
 
-    sprite_emit(SPR_STAR_SMILE, 22, 46, 0, 0);
-    sprite_emit(SPR_STAR_SMILE, 58, 28, 0, 0);
-    sprite_emit(SPR_STAR_SMILE, 152, 34, 0, 0);
-    sprite_emit(SPR_STAR_SMILE, 184, 58, 0, 0);
+    sprite_emit(SPR_TITLE_ROCKET, 198, 30, 0, 0);
+    sprite_emit(SPR_BOLT, 184, 44, 1, 0);
+    sprite_emit(SPR_BOLT, 170, 56, 1, 0);
+    sprite_emit(SPR_BOLT, 156, 68, 1, 0);
 
-    sprite_emit(SPR_LIGHT_POWER, 24, 20, 0, 0);
-    sprite_emit(SPR_LIGHT_POWER, 196, 20, 0, 0);
-    sprite_emit(SPR_BRICK, 88, 72, 0, 0);
-    sprite_emit(SPR_BRICK, 104, 72, 0, 0);
-    sprite_emit(SPR_BRICK, 120, 72, 0, 0);
-    sprite_emit(SPR_BRICK, 136, 72, 0, 0);
+    sprite_emit(SPR_STAR_SMILE, 16, 30, 0, 0);
+    sprite_emit(SPR_STAR_SMILE, 48, 18, 0, 0);
+    sprite_emit(SPR_STAR_SMILE, 96, 24, 0, 0);
+    sprite_emit(SPR_STAR_SMILE, 144, 24, 0, 0);
+    sprite_emit(SPR_STAR_SMILE, 174, 18, 0, 0);
+    sprite_emit(SPR_STAR_SMILE, 218, 52, 0, 0);
+    sprite_emit(SPR_LIGHT_POWER, 20, 52, 0, 0);
+    sprite_emit(SPR_LIGHT_POWER, 220, 18, 0, 0);
 }
 
 static void draw_title_screen(void) {
-    consoleDrawText(6, 2, "STARSPRINT");
-    consoleDrawText(4, 4, "COVER-STYLE HERO ADVENTURE");
-    consoleDrawText(4, 22, "B JUMPS / RELEASES ROPES");
-    consoleDrawText(3, 23, "Y RUNS, USES BOOST, AND FIRES");
-    consoleDrawText(4, 24, "DOWN SMASHES BRICKS UNDERFOOT");
-    consoleDrawText(4, 25, "COLLECT 100 STARS FOR 1 MIN BOOST");
-    consoleDrawText(4, 26, "SELECT TOGGLE MODE: %s", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN");
-    consoleDrawText(6, 27, "PRESS START FOR MAP");
+    consoleDrawText(5, 2, "STAR SPRINT");
+    consoleDrawText(2, 4, "ARCADE COVER ACTION EDITION");
+    consoleDrawText(5, 22, "B JUMP / ROPE RELEASE");
+    consoleDrawText(4, 23, "Y RUN, BOOST, AND LIGHT FIRE");
+    consoleDrawText(3, 24, "COLLECT 100 STARS: +1 MIN SPEED");
+    consoleDrawText(4, 25, "SELECT MODE: %s", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN");
+    consoleDrawText(4, 27, "PRESS START FOR WORLD MAP");
 }
 
 static void update_title_input(void) {
@@ -1444,8 +1503,15 @@ static void draw_world_map_scene(void) {
             } else {
                 sprite_emit(SPR_USED_BLOCK, x, y, 0, 0);
             }
+            if ((idx & 1) == 0) {
+                sprite_emit(SPR_STAR_SMILE, x - 6, y - 26, 0, 0);
+            }
         }
     }
+
+    sprite_emit(SPR_TITLE_ROCKET, 212, 26, 0, 0);
+    sprite_emit(SPR_BOLT, 196, 38, 1, 0);
+    sprite_emit(SPR_BOLT, 182, 48, 1, 0);
 
     {
         u8 row = selectedLevel / LEVELS_PER_WORLD;
@@ -1457,7 +1523,7 @@ static void draw_world_map_scene(void) {
 static void draw_world_map(void) {
     u8 row;
     u8 col;
-    consoleDrawText(2, 1, "STARSPRINT WORLD MAP");
+    consoleDrawText(2, 1, "STAR SPRINT WORLD MAP");
     consoleDrawText(2, 2, "D-PAD MOVE  START/A PLAY");
     consoleDrawText(2, 3, "CLEAR LEVELS TO UNLOCK MORE");
     consoleDrawText(2, 4, "MODE %s  BOOST %03us", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN", (u16)(superReserveFrames / 60));
@@ -1569,7 +1635,7 @@ static void set_backdrop_for_state(u8 state) {
     } else if (state == STATE_ALL_CLEAR) {
         setPaletteColor(0, RGB5(20, 12, 6));
     } else {
-        setPaletteColor(0, RGB5(18, 24, 31));
+        setPaletteColor(0, RGB5(2, 4, 16));
     }
 }
 
@@ -1578,7 +1644,7 @@ static void init_video(void) {
     consoleSetTextGfxPtr(0x3000);
     consoleSetTextOffset(0x0100);
     consoleInitText(0, 16 * 2, &tilfont, &palfont);
-    consoleSetTextPal(0, (u8 *)uiTextPal, sizeof(uiTextPal));
+    apply_ui_theme(STATE_TITLE);
 
     bgSetGfxPtr(0, 0x3000);
     bgSetMapPtr(0, 0x6800, SC_32x32);
@@ -1623,7 +1689,7 @@ int main(void) {
         }
 
         if (gameState == STATE_TITLE) {
-            consoleSetTextPal(0, (u8 *)uiTextPal, sizeof(uiTextPal));
+            apply_ui_theme(gameState);
             update_title_input();
             sprite_begin();
             draw_title_scene();
@@ -1632,6 +1698,7 @@ int main(void) {
         } else if (gameState == STATE_PLAY) {
             u8 simStep;
             u8 simSteps = 1;
+            apply_ui_theme(gameState);
             if (superActive) {
                 if (superReserveFrames > 0) superReserveFrames--;
                 else superActive = 0;
@@ -1662,20 +1729,20 @@ int main(void) {
             sprite_end();
             draw_play_hud();
         } else if (gameState == STATE_WORLD_MAP) {
-            consoleSetTextPal(0, (u8 *)uiTextPal, sizeof(uiTextPal));
+            apply_ui_theme(gameState);
             update_world_map_input();
             sprite_begin();
             draw_world_map_scene();
             sprite_end();
             draw_world_map();
         } else if (gameState == STATE_LEVEL_CLEAR) {
-            consoleSetTextPal(0, (u8 *)uiTextPal, sizeof(uiTextPal));
+            apply_ui_theme(gameState);
             update_level_clear_input();
             sprite_begin();
             sprite_end();
             draw_level_clear_screen();
         } else {
-            consoleSetTextPal(0, (u8 *)uiTextPal, sizeof(uiTextPal));
+            apply_ui_theme(gameState);
             update_all_clear_input();
             sprite_begin();
             sprite_end();

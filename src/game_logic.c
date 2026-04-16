@@ -31,6 +31,17 @@ uint8_t sound_for_event(uint8_t eventId) {
     return eventId;
 }
 
+uint8_t ui_theme_for_state(uint8_t gameState) {
+    if (gameState == 0) return UI_THEME_TITLE;
+    if (gameState == 1) return UI_THEME_MAP;
+    if (gameState == 2) return UI_THEME_PLAY;
+    return UI_THEME_CLEAR;
+}
+
+uint8_t level_style_seed(uint8_t levelIndex, uint8_t salt) {
+    return (uint8_t)((levelIndex * 17u + salt * 29u + 11u) & 31u);
+}
+
 void award_star_and_super(uint8_t *starsTowardCharge, uint16_t *superReserveFrames, uint16_t framesPerCharge) {
     if (!starsTowardCharge || !superReserveFrames) return;
     if (*starsTowardCharge < STAR_METER_MAX) {

@@ -41,6 +41,22 @@ static void test_sound_for_event(void) {
     assert(sound_for_event(99) == SFX_NONE);
 }
 
+static void test_ui_theme_for_state(void) {
+    assert(ui_theme_for_state(0) == UI_THEME_TITLE);
+    assert(ui_theme_for_state(1) == UI_THEME_MAP);
+    assert(ui_theme_for_state(2) == UI_THEME_PLAY);
+    assert(ui_theme_for_state(3) == UI_THEME_CLEAR);
+    assert(ui_theme_for_state(4) == UI_THEME_CLEAR);
+}
+
+static void test_level_style_seed(void) {
+    assert(level_style_seed(0, 0) == 11);
+    assert(level_style_seed(1, 0) == 28);
+    assert(level_style_seed(0, 1) == 8);
+    assert(level_style_seed(11, 7) <= 31);
+    assert(level_style_seed(255, 255) <= 31);
+}
+
 static void test_award_star_and_super(void) {
     uint8_t stars = 99;
     uint16_t reserve = 0;
@@ -68,6 +84,8 @@ int main(void) {
     test_merge_coop_input();
     test_next_turn_player();
     test_sound_for_event();
+    test_ui_theme_for_state();
+    test_level_style_seed();
     test_award_star_and_super();
     test_grant_extra_life();
     test_lose_life_and_continue();
