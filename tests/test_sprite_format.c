@@ -45,11 +45,11 @@ static void test_first_sprite_tile_matches_expected_planes(void) {
 
 static void test_sprite_frame_offset_16x16_layout(void) {
     assert(sprite_frame_offset_16x16(0) == 0);
-    assert(sprite_frame_offset_16x16(1) == 4);
-    assert(sprite_frame_offset_16x16(7) == 28);
-    assert(sprite_frame_offset_16x16(8) == 32);
-    assert(sprite_frame_offset_16x16(11) == 44);
-    assert(sprite_frame_offset_16x16(15) == 60);
+    assert(sprite_frame_offset_16x16(1) == 128);
+    assert(sprite_frame_offset_16x16(7) == 896);
+    assert(sprite_frame_offset_16x16(8) == 1024);
+    assert(sprite_frame_offset_16x16(11) == 1408);
+    assert(sprite_frame_offset_16x16(15) == 1920);
 }
 
 int main(void) {
