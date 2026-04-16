@@ -1,0 +1,8 @@
+[objects]
+src/assets.obj
+src/main.obj
+data.obj
+/mnt/data/pvsneslib/pvsneslib/lib/LoROM_SlowROM/crt0_snes.obj
+/mnt/data/pvsneslib/pvsneslib/lib/LoROM_SlowROM/libc.obj
+/mnt/data/pvsneslib/pvsneslib/lib/LoROM_SlowROM/libm.obj
+/mnt/data/pvsneslib/pvsneslib/lib/LoROM_SlowROM/libtcc.obj
