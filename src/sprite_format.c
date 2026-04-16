@@ -24,9 +24,8 @@ void convert_interleaved_4bpp_to_snes(const uint8_t *src, uint8_t *dst, size_t b
 uint16_t sprite_frame_offset_16x16(uint8_t frameIndex) {
     /*
      * PVSnesLib's oamSet() expects the character offset in 8x8 tile units.
-     * StarSprint's sprite atlas packs 16x16 frames in rows of 8 frames.
-     * Each frame advances by 2 8x8 tiles in X, and moving to the next row
-     * advances by one full 8x8-tile row (32 tile units).
+     * StarSprint's sprite atlas stores each 16x16 frame as four contiguous
+     * 8x8 tiles (top-left, top-right, bottom-left, bottom-right).
      */
-    return (uint16_t)(((frameIndex >> 3) * 32u) + ((frameIndex & 7u) * 2u));
+    return (uint16_t)(frameIndex * 4u);
 }

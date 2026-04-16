@@ -59,21 +59,21 @@ static void test_uploaded_sprite_tile_stays_in_packaged_layout(void) {
 
 static void test_sprite_frame_offset_16x16_layout(void) {
     assert(sprite_frame_offset_16x16(0) == 0);
-    assert(sprite_frame_offset_16x16(1) == 2);
-    assert(sprite_frame_offset_16x16(7) == 14);
+    assert(sprite_frame_offset_16x16(1) == 4);
+    assert(sprite_frame_offset_16x16(7) == 28);
     assert(sprite_frame_offset_16x16(8) == 32);
-    assert(sprite_frame_offset_16x16(11) == 38);
-    assert(sprite_frame_offset_16x16(15) == 46);
+    assert(sprite_frame_offset_16x16(11) == 44);
+    assert(sprite_frame_offset_16x16(15) == 60);
 }
 
 static void test_sprite_offsets_fit_uploaded_tile_buffer(void) {
     /*
-     * Frame 15 starts at tile offset 46, and a 16x16 frame references two
-     * adjacent 8x8 tiles on this packed sheet, so the highest tile index is 47.
+     * Frame 15 starts at tile offset 60, and a 16x16 frame references four
+     * adjacent 8x8 tiles, so the highest tile index is 63.
      * The uploaded sprite sheet is 2048 bytes => 64 tiles at 32 bytes/tile.
      */
     uint16_t finalFrameTileOffset = sprite_frame_offset_16x16(15);
-    size_t bytesConsumedByFrames = ((size_t)finalFrameTileOffset + 2u) * 32u;
+    size_t bytesConsumedByFrames = ((size_t)finalFrameTileOffset + 4u) * 32u;
     assert(bytesConsumedByFrames <= SPRITE_TILES_LEN);
 }
 
