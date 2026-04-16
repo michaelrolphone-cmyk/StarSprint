@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarSprint Level Editor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>StarSprint Level Editor</h1>
+      <p class="hint">No dependencies. Serve this folder and edit files in <code>level-editor/levels/</code>.</p>
+
+      <section class="toolbar">
+        <label>
+          Level file
+          <select id="levelSelect"></select>
+        </label>
+        <button id="newLevelBtn" type="button">New Level</button>
+
+        <label>
+          Width
+          <input id="widthInput" type="number" min="1" value="16" />
+        </label>
+        <label>
+          Height
+          <input id="heightInput" type="number" min="1" value="12" />
+        </label>
+        <button id="resizeBtn" type="button">Resize</button>
+      </section>
+
+      <section class="toolbar">
+        <label>
+          Tile value
+          <input id="tilePicker" type="number" min="0" step="1" value="1" />
+        </label>
+        <label>
+          <input id="spawnMode" type="checkbox" /> Place spawn point instead of tiles
+        </label>
+        <button id="importBtn" type="button">Import JSON</button>
+        <button id="exportBtn" type="button">Export JSON</button>
+      </section>
+
+      <p id="status" class="ok">Loading levels...</p>
+
+      <section class="workspace">
+        <div id="gridHost" class="grid" aria-label="Tile grid"></div>
+        <label class="json-pane">
+          Level JSON
+          <textarea id="jsonEditor" spellcheck="false"></textarea>
+        </label>
+      </section>
+    </main>
+
+    <script src="editor-core.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

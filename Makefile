@@ -20,6 +20,8 @@ all: $(ROMNAME).sfc
 clean: cleanBuildRes cleanRom cleanGfx cleanAudio
 
 test:
+	node tests/test_level_editor_core.js
+	node tests/test_level_files.js
 	cc -std=c99 -Wall -Wextra -pedantic tests/test_sprite_format.c src/sprite_format.c src/assets.c -o tests/test_sprite_format
 	./tests/test_sprite_format
 	cc -std=c99 -Wall -Wextra -pedantic tests/test_game_logic.c src/game_logic.c -o tests/test_game_logic

@@ -61,6 +61,28 @@ If you already have `starsprint.sfc`, run this command to package without rebuil
 make bundle-prebuilt
 ```
 
+
+## Standalone level editor
+
+A dependency-free browser level editor is included in `level-editor/`.
+
+### Level file folder
+
+All editable level files live in `level-editor/levels/`.
+- `index.json` is the manifest loaded by the editor.
+- Each level is a JSON file listed in that manifest.
+
+### Run the editor
+
+Serve the repository root (or the `level-editor/` folder) with a static server, then open the editor page:
+
+```sh
+python3 -m http.server 8000
+# then open http://localhost:8000/level-editor/
+```
+
+Use **Export JSON** to download a level file, then move it into `level-editor/levels/` and add the filename to `level-editor/levels/index.json`.
+
 ## Test commands
 
 Run all unit tests with:

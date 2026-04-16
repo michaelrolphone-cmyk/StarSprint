@@ -1,0 +1,105 @@
+:root {
+  color-scheme: dark;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #0b1020;
+  color: #f4f6ff;
+}
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+h1 {
+  margin-top: 0;
+}
+
+.hint {
+  color: #b8c2ff;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.toolbar label {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+input,
+select,
+button,
+textarea {
+  background: #131b34;
+  color: inherit;
+  border: 1px solid #36436f;
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.grid {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  overflow: auto;
+  max-height: 70vh;
+}
+
+.cell {
+  width: 28px;
+  height: 28px;
+  font-size: 0.75rem;
+  padding: 0;
+}
+
+.cell.spawn {
+  border-color: #2dff9f;
+  box-shadow: 0 0 0 1px #2dff9f inset;
+}
+
+.json-pane {
+  display: grid;
+  gap: 0.5rem;
+}
+
+#jsonEditor {
+  min-height: 70vh;
+  width: 100%;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+}
+
+#status.ok {
+  color: #95ffa8;
+}
+
+#status.error {
+  color: #ff8f8f;
+}
+
+@media (max-width: 960px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
