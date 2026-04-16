@@ -43,6 +43,20 @@ static void test_first_sprite_tile_matches_expected_planes(void) {
     assert(memcmp(converted, expected, sizeof(converted)) == 0);
 }
 
+static void test_uploaded_sprite_tile_stays_in_packaged_layout(void) {
+    static const uint8_t expectedRawFirstTile[32] = {
+        0x0F, 0x0C, 0x0C, 0x00, 0x1C, 0x1C, 0x0F, 0x00,
+        0x1F, 0x0C, 0x0C, 0x00, 0x3F, 0x00, 0x1B, 0x03,
+        0x3F, 0x00, 0x1F, 0x07, 0x3F, 0x00, 0x1D, 0x05,
+        0x3F, 0x00, 0x1F, 0x07, 0x3F, 0x02, 0x1B, 0x03
+    };
+    uint8_t converted[32];
+
+    assert(memcmp(sprite_tiles, expectedRawFirstTile, sizeof(expectedRawFirstTile)) == 0);
+    convert_interleaved_4bpp_to_snes(sprite_tiles, converted, sizeof(converted));
+    assert(memcmp(converted, expectedRawFirstTile, sizeof(converted)) != 0);
+}
+
 static void test_sprite_frame_offset_16x16_layout(void) {
     assert(sprite_frame_offset_16x16(0) == 0);
     assert(sprite_frame_offset_16x16(1) == 4);
@@ -65,6 +79,7 @@ static void test_sprite_offsets_fit_uploaded_tile_buffer(void) {
 int main(void) {
     test_single_tile_relayout();
     test_first_sprite_tile_matches_expected_planes();
+    test_uploaded_sprite_tile_stays_in_packaged_layout();
     test_sprite_frame_offset_16x16_layout();
     test_sprite_offsets_fit_uploaded_tile_buffer();
     return 0;
