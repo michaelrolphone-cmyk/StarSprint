@@ -43,8 +43,16 @@ static void test_first_sprite_tile_matches_expected_planes(void) {
     assert(memcmp(converted, expected, sizeof(converted)) == 0);
 }
 
+static void test_sprite_frame_offset_16x16_layout(void) {
+    assert(sprite_frame_offset_16x16(0) == 0);
+    assert(sprite_frame_offset_16x16(1) == 4);
+    assert(sprite_frame_offset_16x16(7) == 28);
+    assert(sprite_frame_offset_16x16(8) == 64);
+}
+
 int main(void) {
     test_single_tile_relayout();
     test_first_sprite_tile_matches_expected_planes();
+    test_sprite_frame_offset_16x16_layout();
     return 0;
 }

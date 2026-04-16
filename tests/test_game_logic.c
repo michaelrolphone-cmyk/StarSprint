@@ -41,12 +41,36 @@ static void test_sound_for_event(void) {
     assert(sound_for_event(99) == SFX_NONE);
 }
 
+static void test_award_star_and_super(void) {
+    uint8_t stars = 99;
+    uint16_t reserve = 0;
+    award_star_and_super(&stars, &reserve, 3600);
+    assert(stars == 0);
+    assert(reserve == 3600);
+}
+
+static void test_grant_extra_life(void) {
+    assert(grant_extra_life(5, 9) == 6);
+    assert(grant_extra_life(9, 9) == 9);
+}
+
+static void test_lose_life_and_continue(void) {
+    uint8_t lives = 2;
+    assert(lose_life_and_continue(&lives) == 1);
+    assert(lives == 1);
+    assert(lose_life_and_continue(&lives) == 0);
+    assert(lives == 0);
+}
+
 int main(void) {
     test_should_attempt_rope_grab();
     test_should_run_secondary_substep();
     test_merge_coop_input();
     test_next_turn_player();
     test_sound_for_event();
+    test_award_star_and_super();
+    test_grant_extra_life();
+    test_lose_life_and_continue();
     puts("test_game_logic: ok");
     return 0;
 }

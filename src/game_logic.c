@@ -30,3 +30,25 @@ uint8_t sound_for_event(uint8_t eventId) {
     if (eventId > SFX_TURN_SWAP) return SFX_NONE;
     return eventId;
 }
+
+void award_star_and_super(uint8_t *starsTowardCharge, uint16_t *superReserveFrames, uint16_t framesPerCharge) {
+    if (!starsTowardCharge || !superReserveFrames) return;
+    if (*starsTowardCharge < STAR_METER_MAX) {
+        (*starsTowardCharge)++;
+    }
+    while (*starsTowardCharge >= STAR_METER_MAX) {
+        *starsTowardCharge -= STAR_METER_MAX;
+        *superReserveFrames = (uint16_t)(*superReserveFrames + framesPerCharge);
+    }
+}
+
+uint8_t grant_extra_life(uint8_t lives, uint8_t maxLives) {
+    if (lives < maxLives) return (uint8_t)(lives + 1);
+    return lives;
+}
+
+uint8_t lose_life_and_continue(uint8_t *lives) {
+    if (!lives || *lives == 0) return 0;
+    (*lives)--;
+    return (*lives > 0) ? 1 : 0;
+}

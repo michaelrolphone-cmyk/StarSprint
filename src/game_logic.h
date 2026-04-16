@@ -16,10 +16,16 @@
 #define SFX_LEVEL_CLEAR 7
 #define SFX_TURN_SWAP 8
 
+#define STAR_METER_MAX 100
+#define PLAYER_START_LIVES 5
+
 uint8_t should_attempt_rope_grab(uint8_t onRope, uint8_t onGround, uint8_t ropeGrabLock);
 uint8_t should_run_secondary_substep(int16_t playerVx, int16_t playerVy, uint8_t superActive, uint8_t activeBolts);
 uint16_t merge_coop_input(uint16_t pad0, uint16_t pad1, uint8_t mode, uint8_t activeTurnPlayer);
 uint8_t next_turn_player(uint8_t mode, uint8_t activeTurnPlayer, uint8_t swapRequested);
 uint8_t sound_for_event(uint8_t eventId);
+void award_star_and_super(uint8_t *starsTowardCharge, uint16_t *superReserveFrames, uint16_t framesPerCharge);
+uint8_t grant_extra_life(uint8_t lives, uint8_t maxLives);
+uint8_t lose_life_and_continue(uint8_t *lives);
 
 #endif
