@@ -2,6 +2,17 @@
 #include "assets.h"
 #include "sprite_format.h"
 #include "game_logic.h"
+#include "video_layout.h"
+
+// PVSnesLib 4.5+ renamed these APIs. Keep backward compatibility with
+// older toolchains so the project still builds in both environments.
+#ifndef consoleSetTextVramBGAdr
+#define consoleSetTextVramBGAdr consoleSetTextGfxPtr
+#endif
+
+#ifndef consoleSetTextVramAdr
+#define consoleSetTextVramAdr consoleSetTextMapPtr
+#endif
 
 extern char tilfont, palfont;
 
@@ -1640,14 +1651,16 @@ static void set_backdrop_for_state(u8 state) {
 }
 
 static void init_video(void) {
-    consoleSetTextMapPtr(0x6800);
-    consoleSetTextGfxPtr(0x3000);
-    consoleSetTextOffset(0x0100);
+    // NOTE: BGAdr is the font tile graphics address, and Adr is the tilemap.
+    // Swapping these two causes text/sprite VRAM corruption on screen.
+    consoleSetTextVramBGAdr(TEXT_VRAM_GFX_ADDR);
+    consoleSetTextVramAdr(TEXT_VRAM_MAP_ADDR);
+    consoleSetTextOffset(TEXT_VRAM_OFFSET);
     consoleInitText(0, 16 * 2, &tilfont, &palfont);
     apply_ui_theme(STATE_TITLE);
 
-    bgSetGfxPtr(0, 0x3000);
-    bgSetMapPtr(0, 0x6800, SC_32x32);
+    bgSetGfxPtr(0, TEXT_VRAM_GFX_ADDR);
+    bgSetMapPtr(0, TEXT_VRAM_MAP_ADDR, SC_32x32);
     setMode(BG_MODE1, 0);
     bgSetDisable(1);
     bgSetDisable(2);

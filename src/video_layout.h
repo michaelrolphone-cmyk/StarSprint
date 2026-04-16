@@ -1,0 +1,8 @@
+#ifndef VIDEO_LAYOUT_H
+#define VIDEO_LAYOUT_H
+
+#define TEXT_VRAM_GFX_ADDR 0x3000
+#define TEXT_VRAM_MAP_ADDR 0x6800
+#define TEXT_VRAM_OFFSET 0x0100
+
+#endif
