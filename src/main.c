@@ -47,7 +47,9 @@ extern char tilfont, palfont;
 #define POINT_STAR 100
 #define POINT_ENEMY 200
 #define POINT_BLOCK 50
+#define POINT_LIFE 500
 #define SUPER_FRAMES_PER_MINUTE 3600
+#define MAX_LIVES 9
 #define LEVEL_GOAL_X ((LEVEL_W * TILE_SIZE) - 40)
 
 #define BLANK_LINE "                                "
@@ -59,12 +61,14 @@ enum TileType {
     TILE_USED,
     TILE_POWER_GROW,
     TILE_POWER_LIGHT,
+    TILE_POWER_LIFE,
     TILE_SPIKES
 };
 
 enum PowerType {
     POWER_GROW = 1,
-    POWER_LIGHTNING = 2
+    POWER_LIGHTNING = 2,
+    POWER_LIFE = 3
 };
 
 enum EnemyType {
@@ -156,6 +160,7 @@ static Rope ropes[MAX_ROPES];
 static u16 score = 0;
 static u8 starsTowardMinute = 0;
 static u16 superReserveFrames = 0;
+static u8 lives = PLAYER_START_LIVES;
 static u8 superActive = 0;
 static u16 cameraX = 0;
 static u16 pad0 = 0;
@@ -178,6 +183,7 @@ typedef struct {
     u16 score;
     u8 starsTowardMinute;
     u16 superReserveFrames;
+    u8 lives;
     u8 big;
     u8 lightning;
 } PlayerRunState;
@@ -197,10 +203,6 @@ static const u16 uiTextPal[16] = {
     0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF
 };
 
-static u16 frame_offset(u8 frameIndex) {
-    return ((frameIndex >> 3) * 32) + ((frameIndex & 7) * 2);
-}
-
 static void play_sfx(u8 eventId) {
     (void)sound_for_event(eventId);
 }
@@ -209,6 +211,7 @@ static void save_active_run_state(void) {
     runState[activeTurnPlayer].score = score;
     runState[activeTurnPlayer].starsTowardMinute = starsTowardMinute;
     runState[activeTurnPlayer].superReserveFrames = superReserveFrames;
+    runState[activeTurnPlayer].lives = lives;
     runState[activeTurnPlayer].big = player.big;
     runState[activeTurnPlayer].lightning = player.lightning;
 }
@@ -217,6 +220,7 @@ static void load_active_run_state(void) {
     score = runState[activeTurnPlayer].score;
     starsTowardMinute = runState[activeTurnPlayer].starsTowardMinute;
     superReserveFrames = runState[activeTurnPlayer].superReserveFrames;
+    lives = runState[activeTurnPlayer].lives;
     player.big = runState[activeTurnPlayer].big;
     player.lightning = runState[activeTurnPlayer].lightning;
 }
@@ -410,7 +414,13 @@ static void add_brick_strip(s16 tx0, s16 tx1, s16 ty) {
 }
 
 static void add_hidden_power(s16 tx, s16 ty, u8 type) {
-    set_tile(tx, ty, (type == POWER_GROW) ? TILE_POWER_GROW : TILE_POWER_LIGHT);
+    if (type == POWER_GROW) {
+        set_tile(tx, ty, TILE_POWER_GROW);
+    } else if (type == POWER_LIGHTNING) {
+        set_tile(tx, ty, TILE_POWER_LIGHT);
+    } else {
+        set_tile(tx, ty, TILE_POWER_LIFE);
+    }
 }
 
 static void add_stairs(s16 tx, s16 steps, s16 dir) {
@@ -529,6 +539,12 @@ static void build_level(u8 levelIndex) {
         add_ground_platform(38, 39, 10);
         add_ground_platform(44, 46, 10);
     }
+
+    {
+        s16 lifeTx = 18 + (stage * 8) + (world * 19);
+        if (lifeTx > LEVEL_W - 24) lifeTx = LEVEL_W - 24;
+        add_hidden_power(lifeTx, 7, POWER_LIFE);
+    }
 }
 
 static void reset_player_position(void) {
@@ -584,7 +600,7 @@ static u8 completed_count(void) {
 }
 
 static u8 is_solid(u8 tile) {
-    return (tile == TILE_GROUND || tile == TILE_BRICK || tile == TILE_USED || tile == TILE_POWER_GROW || tile == TILE_POWER_LIGHT || tile == TILE_SPIKES);
+    return (tile == TILE_GROUND || tile == TILE_BRICK || tile == TILE_USED || tile == TILE_POWER_GROW || tile == TILE_POWER_LIGHT || tile == TILE_POWER_LIFE || tile == TILE_SPIKES);
 }
 
 static u8 is_breakable(u8 tile) {
@@ -592,7 +608,7 @@ static u8 is_breakable(u8 tile) {
 }
 
 static u8 is_question(u8 tile) {
-    return (tile == TILE_POWER_GROW || tile == TILE_POWER_LIGHT);
+    return (tile == TILE_POWER_GROW || tile == TILE_POWER_LIGHT || tile == TILE_POWER_LIFE);
 }
 
 static u8 tile_at(s16 tx, s16 ty) {
@@ -646,6 +662,12 @@ static void hit_block_from_below(s16 tx, s16 ty) {
         score += POINT_BLOCK;
         return;
     }
+    if (tile == TILE_POWER_LIFE) {
+        levelMap[(u8)ty][(u8)tx] = TILE_USED;
+        spawn_powerup(POWER_LIFE, tx, ty);
+        score += POINT_BLOCK;
+        return;
+    }
 }
 
 static u8 overlap(s16 ax, s16 ay, s16 aw, s16 ah, s16 bx, s16 by, s16 bw, s16 bh) {
@@ -685,14 +707,25 @@ static void player_take_hit(void) {
     }
 
     play_sfx(SFX_HIT);
-    restart_current_level();
+    if (lose_life_and_continue(&lives)) {
+        restart_current_level();
+    } else {
+        lives = PLAYER_START_LIVES;
+        score = 0;
+        starsTowardMinute = 0;
+        superReserveFrames = 0;
+        player.big = 0;
+        player.lightning = 0;
+        if (playerMode == PLAYER_MODE_TURN_BASED) {
+            save_active_run_state();
+            swap_turn_player();
+        }
+        gameState = STATE_WORLD_MAP;
+    }
 }
 
 static void activate_star_reward(void) {
-    while (starsTowardMinute >= 60) {
-        starsTowardMinute -= 60;
-        superReserveFrames += SUPER_FRAMES_PER_MINUTE;
-    }
+    award_star_and_super(&starsTowardMinute, &superReserveFrames, SUPER_FRAMES_PER_MINUTE);
 }
 
 static void update_ropes(void) {
@@ -1114,7 +1147,6 @@ static void handle_pickups_and_hits(void) {
         if (stars[i].active && overlap(player.x, player.y, PLAYER_W, player_height(), stars[i].x + 2, stars[i].y + 2, 12, 12)) {
             stars[i].active = 0;
             score += POINT_STAR;
-            starsTowardMinute++;
             activate_star_reward();
             play_sfx(SFX_STAR);
         }
@@ -1127,9 +1159,11 @@ static void handle_pickups_and_hits(void) {
             } else if (powerups[i].type == POWER_LIGHTNING) {
                 player.big = 1;
                 player.lightning = 1;
+            } else if (powerups[i].type == POWER_LIFE) {
+                lives = grant_extra_life(lives, MAX_LIVES);
             }
             powerups[i].active = 0;
-            score += 250;
+            score += (powerups[i].type == POWER_LIFE) ? POINT_LIFE : 250;
             play_sfx(SFX_POWERUP);
         }
     }
@@ -1185,7 +1219,7 @@ static void sprite_emit(u8 frame, s16 sx, s16 sy, u8 hflip, u8 pal) {
     if (spriteCount >= 128) return;
     if (sx <= -16 || sx >= SCREEN_W || sy <= -16 || sy >= SCREEN_H) return;
     id = (u16)spriteCount * 4;
-    oamSet(id, (u16)sx, (u16)sy, 3, hflip, 0, frame_offset(frame), pal);
+    oamSet(id, (u16)sx, (u16)sy, 3, hflip, 0, sprite_frame_offset_16x16(frame), pal);
     oamSetEx(id, OBJ_SMALL, OBJ_SHOW);
     spriteCount++;
 }
@@ -1256,8 +1290,10 @@ static void draw_powerups(void) {
     u8 i;
     for (i = 0; i < MAX_POWERUPS; i++) {
         if (powerups[i].active) {
-            sprite_emit(powerups[i].type == POWER_GROW ? SPR_GROW_POWER : SPR_LIGHT_POWER,
-                        powerups[i].x - cameraX, powerups[i].y, 0, 0);
+            u8 frame = SPR_GROW_POWER;
+            if (powerups[i].type == POWER_LIGHTNING) frame = SPR_LIGHT_POWER;
+            if (powerups[i].type == POWER_LIFE) frame = SPR_STAR_SMILE;
+            sprite_emit(frame, powerups[i].x - cameraX, powerups[i].y, 0, 0);
         }
     }
 }
@@ -1302,6 +1338,8 @@ static void draw_player(void) {
 
 static void draw_play_hud(void) {
     u16 reserveSeconds = superReserveFrames / 60;
+    u16 reserveMinutes = reserveSeconds / 60;
+    u16 reserveRemainderSeconds = reserveSeconds % 60;
     u8 world = (currentLevel / LEVELS_PER_WORLD) + 1;
     u8 stage = (currentLevel % LEVELS_PER_WORLD) + 1;
     consoleDrawText(0, 0, BLANK_LINE);
@@ -1312,14 +1350,15 @@ static void draw_play_hud(void) {
     consoleDrawText(0, 26, BLANK_LINE);
     consoleDrawText(1, 0, "WORLD %u-%u  %s", world, stage, worldNames[world - 1]);
     consoleDrawText(1, 1, "SCORE %05u", score);
-    consoleDrawText(1, 2, "STARS %02u/60", starsTowardMinute);
-    consoleDrawText(1, 3, "BOOST %03us %s", reserveSeconds, superActive ? "ON " : "OFF");
-    consoleDrawText(1, 4, "FORM  %s", player.lightning ? "LIGHT" : (player.big ? "BIG  " : "SMALL"));
-    consoleDrawText(1, 5, "MODE  %s", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN");
+    consoleDrawText(1, 2, "LIVES %u", lives);
+    consoleDrawText(1, 3, "STARS %03u/100", starsTowardMinute);
+    consoleDrawText(1, 4, "SPEED %02um%02us %s", reserveMinutes, reserveRemainderSeconds, superActive ? "ON " : "OFF");
+    consoleDrawText(1, 5, "FORM  %s", player.lightning ? "LIGHT" : (player.big ? "BIG  " : "SMALL"));
+    consoleDrawText(1, 6, "MODE  %s", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN");
     if (playerMode == PLAYER_MODE_TURN_BASED) {
-        consoleDrawText(1, 6, "ACTIVE P%u", (u8)(activeTurnPlayer + 1));
+        consoleDrawText(1, 7, "ACTIVE P%u", (u8)(activeTurnPlayer + 1));
     } else {
-        consoleDrawText(1, 6, "ACTIVE BOTH");
+        consoleDrawText(1, 7, "ACTIVE BOTH");
     }
     consoleDrawText(1, 26, "B JUMP  Y RUN/BOOST/FIRE");
 }
@@ -1363,7 +1402,7 @@ static void draw_title_screen(void) {
     consoleDrawText(4, 22, "B JUMPS / RELEASES ROPES");
     consoleDrawText(3, 23, "Y RUNS, USES BOOST, AND FIRES");
     consoleDrawText(4, 24, "DOWN SMASHES BRICKS UNDERFOOT");
-    consoleDrawText(4, 25, "COLLECT 60 STARS FOR 1 MIN BOOST");
+    consoleDrawText(4, 25, "COLLECT 100 STARS FOR 1 MIN BOOST");
     consoleDrawText(4, 26, "SELECT TOGGLE MODE: %s", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN");
     consoleDrawText(6, 27, "PRESS START FOR MAP");
 }
@@ -1559,12 +1598,14 @@ int main(void) {
     u8 i;
     init_video();
     reset_player_position();
+    lives = PLAYER_START_LIVES;
     player.big = 0;
     player.lightning = 0;
     for (i = 0; i < 2; i++) {
         runState[i].score = 0;
         runState[i].starsTowardMinute = 0;
         runState[i].superReserveFrames = 0;
+        runState[i].lives = PLAYER_START_LIVES;
         runState[i].big = 0;
         runState[i].lightning = 0;
     }

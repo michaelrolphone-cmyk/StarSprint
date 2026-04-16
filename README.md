@@ -10,8 +10,10 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 - 2-player support with cooperative and turn-based modes
 - contextual sound-effect event hooks for movement, combat, pickups, and turn swaps
 - hidden grow and lightning powerups
+- one hidden extra-life powerup box per level
 - smiley gold stars for score and boost banking
-- 60 stars = 1 minute of banked super speed
+- 100 stars = 1 minute of banked super speed
+- players start each run with 5 lives
 - stomp enemies to defeat them and bounce
 - smash brick blocks from below or by down-smashing in the air
 - bouncing lightning bolts once the lightning form is collected
@@ -37,6 +39,7 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 - Hold Y with banked boost: consume boost and run at super speed
 - Press Y while lightning power is active: throw a lightning bolt
 - Down while falling: smash through brick blocks underfoot
+- Hit hidden life boxes for an extra life (up to 9)
 
 ## Build
 
