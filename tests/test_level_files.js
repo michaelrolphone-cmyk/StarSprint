@@ -4,8 +4,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const core = require('../level-editor/editor-core.js');
+const { loadCoreFromHtml } = require('./load_level_editor_core');
 
+const { core } = loadCoreFromHtml();
 const levelsDir = path.join(__dirname, '..', 'level-editor', 'levels');
 
 test('level manifest exists and each listed file is valid', () => {

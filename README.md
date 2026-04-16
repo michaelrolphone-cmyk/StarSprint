@@ -64,7 +64,7 @@ make bundle-prebuilt
 
 ## Standalone level editor
 
-A dependency-free browser level editor is included in `level-editor/`.
+A dependency-free single-file browser level editor is included at `level-editor/index.html`.
 
 ### Level file folder
 

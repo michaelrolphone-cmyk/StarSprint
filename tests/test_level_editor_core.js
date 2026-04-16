@@ -2,7 +2,21 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const core = require('../level-editor/editor-core.js');
+const { loadCoreFromHtml } = require('./load_level_editor_core');
+
+const { html, core } = loadCoreFromHtml();
+
+function plain(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+test('level editor is standalone HTML with inline assets only', () => {
+  const externalScriptTags = html.match(/<script[^>]+src=/gi) || [];
+  const externalStylesheetLinks = html.match(/<link[^>]+rel=["']stylesheet["']/gi) || [];
+
+  assert.equal(externalScriptTags.length, 0, 'expected no external script tags');
+  assert.equal(externalStylesheetLinks.length, 0, 'expected no external stylesheet links');
+});
 
 test('normalizeLevel applies defaults and clamps spawn', () => {
   const level = core.normalizeLevel({
@@ -15,8 +29,8 @@ test('normalizeLevel applies defaults and clamps spawn', () => {
 
   assert.equal(level.id, 'demo');
   assert.equal(level.name, 'demo');
-  assert.deepEqual(level.spawn, { x: 2, y: 0 });
-  assert.deepEqual(level.tiles, [
+  assert.deepEqual(plain(level.spawn), { x: 2, y: 0 });
+  assert.deepEqual(plain(level.tiles), [
     [7, 0, 0],
     [8, 9, 10]
   ]);
@@ -51,5 +65,5 @@ test('serialize/parse round trip preserves shape', () => {
   const json = core.serializeLevel(original);
   const parsed = core.parseLevel(json);
 
-  assert.deepEqual(parsed, original);
+  assert.deepEqual(plain(parsed), plain(original));
 });
