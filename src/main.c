@@ -1267,7 +1267,7 @@ static void sprite_emit(u8 frame, s16 sx, s16 sy, u8 hflip, u8 pal) {
     u16 id;
     if (spriteCount >= 128) return;
     if (sx <= -16 || sx >= SCREEN_W || sy <= -16 || sy >= SCREEN_H) return;
-    id = (u16)spriteCount * 4;
+    id = (u16)spriteCount;
     oamSet(id, (u16)sx, (u16)sy, 3, hflip, 0, sprite_frame_offset_16x16(frame), pal);
     oamSetEx(id, OBJ_SMALL, OBJ_SHOW);
     spriteCount++;
@@ -1276,7 +1276,7 @@ static void sprite_emit(u8 frame, s16 sx, s16 sy, u8 hflip, u8 pal) {
 static void sprite_end(void) {
     u16 id;
     while (spriteCount < 128) {
-        id = (u16)spriteCount * 4;
+        id = (u16)spriteCount;
         oamSetVisible(id, OBJ_HIDE);
         spriteCount++;
     }
