@@ -43,9 +43,14 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 
 ## Build
 
-Clone and install PVSnesLib from https://github.com/alekmaul/pvsneslib, set `PVSNESLIB_HOME` to that checkout, then run:
+Use PVSnesLib `4.5.0`, set `PVSNESLIB_HOME` to that checkout, then run:
 
 ```sh
+git clone https://github.com/alekmaul/pvsneslib
+cd pvsneslib
+git checkout 4.5.0
+export PVSNESLIB_HOME="$(pwd)"
+cd /path/to/StarSprint
 make clean
 make
 make test
@@ -90,6 +95,8 @@ Run all unit tests with:
 ```sh
 make test
 ```
+
+The test suite includes `tests/test_pvsneslib_450_api_regression.sh`, which verifies StarSprint source usage matches the project's required PVSnesLib 4.5.0 API symbols.
 
 ## Latest tuning notes
 

@@ -27,3 +27,9 @@ Fix broken in-game sprite rendering without repeating failed experiments.
 - Added a regression check to ensure the broken alias block does not return.
 - Restored explicit sprite-tile lane conversion before OAM upload and upload from the converted buffer.
 - Restored linear frame addressing (`frameIndex * 4`) so each 16x16 frame maps to its contiguous 2x2 tile block.
+
+
+## Current hypotheses to validate
+
+- Runtime conversion may be necessary, but frame indexing must match packed atlas rows.
+- The next fix attempts packed frame offsets while keeping the known-good text VRAM init path intact.
