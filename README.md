@@ -39,7 +39,9 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 - Hold Y while latched: slide down the wall at half fall speed
 - Press B during a wall latch: wall-jump away from the wall only
 - If held, press B to jump free and escape
+- Press Down while running on the ground: start a momentum slide (about 2 blocks at run speed, 4 blocks with super speed)
 - Down while falling: smash through brick blocks underfoot
+- In co-op, players dragged behind the camera are pulled forward to the left screen edge so both stay on-screen
 
 ## Build
 
