@@ -37,6 +37,8 @@ extern char tilfont, palfont;
 #define PLAYER_PICKUP_RANGE_X 18
 #define PLAYER_PICKUP_RANGE_Y 16
 #define PLAYER_HELD_OFFSET_Y 12
+#define STAR_COLLECT_PADDING_X 3
+#define STAR_COLLECT_PADDING_Y 3
 
 #define SPEED_WALK 4
 #define SPEED_RUN 6
@@ -1256,7 +1258,16 @@ static void handle_pickups_and_hits(void) {
         if (!stars[i].active) continue;
         for (pidx = 0; pidx < MAX_PLAYERS; pidx++) {
             Player *p = &players[pidx];
-            if (overlap(p->x, p->y, PLAYER_W, player_height(p), stars[i].x + 2, stars[i].y + 2, 12, 12)) {
+            if (overlap(
+                p->x - STAR_COLLECT_PADDING_X,
+                p->y - STAR_COLLECT_PADDING_Y,
+                PLAYER_W + (STAR_COLLECT_PADDING_X * 2),
+                player_height(p) + (STAR_COLLECT_PADDING_Y * 2),
+                stars[i].x + 2,
+                stars[i].y + 2,
+                12,
+                12
+            )) {
                 stars[i].active = 0;
                 score += POINT_STAR;
                 starsTowardMinute++;
@@ -1332,8 +1343,14 @@ static void apply_coop_screen_drag(void) {
     s16 leftEdge = (s16)cameraX;
     for (i = 0; i < MAX_PLAYERS; i++) {
         if (players[i].x < leftEdge) {
+            s16 dragDelta = leftEdge - players[i].x;
             players[i].x = leftEdge;
             if (players[i].vx < 0) players[i].vx = 0;
+            if (players[i].holding < MAX_PLAYERS) {
+                Player *held = &players[players[i].holding];
+                held->x += dragDelta;
+                if (held->x < leftEdge) held->x = leftEdge;
+            }
         }
     }
 }
