@@ -222,9 +222,6 @@ static const u16 uiTextPal[16] = {
 #define DYNAMIC_SPRITE_GFX1 0x1000
 #define DYNAMIC_SPRITE_ATTR_BASE 0x21
 #define DYNAMIC_SPRITE_ATTR_HFLIP 0x40
-#define SPRITE_FRAME_BYTES 128
-
-
 static void clear_text_screen(void) {
     u8 y;
     for (y = 0; y < TEXT_ROWS; y++) {
@@ -1389,19 +1386,17 @@ static void sprite_emit(u8 frame, s16 sx, s16 sy, u8 hflip, u8 pal) {
 
     oambuffer[spriteCount].oamx = sx;
     oambuffer[spriteCount].oamy = sy;
-    oambuffer[spriteCount].oamframeid = 0;
+    oambuffer[spriteCount].oamframeid = frame;
     oambuffer[spriteCount].oamattribute = spriteAttr;
     oambuffer[spriteCount].oamrefresh = 1;
-    oambuffer[spriteCount].oamgraphics = ((u8 *)sprite_tiles) + ((u16)frame * SPRITE_FRAME_BYTES);
+    oambuffer[spriteCount].oamgraphics = (u8 *)sprite_tiles;
     oamDynamic16Draw(spriteCount);
     spriteCount++;
 }
 
 static void sprite_end(void) {
-    u16 id;
     while (spriteCount < 128) {
-        id = (u16)spriteCount * 4;
-        oamSetVisible(id, OBJ_HIDE);
+        oamSetVisible(spriteCount, OBJ_HIDE);
         spriteCount++;
     }
 }
