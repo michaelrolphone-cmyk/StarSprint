@@ -59,6 +59,7 @@ extern void consoleVblank(void);
 #define POINT_BLOCK 50
 #define SUPER_FRAMES_PER_MINUTE 3600
 #define LEVEL_GOAL_X ((LEVEL_W * TILE_SIZE) - 40)
+#define PLAY_TICKS_PER_FRAME 2
 
 #define BLANK_LINE "                                "
 
@@ -2012,23 +2013,31 @@ int main(void) {
             sprite_end();
             draw_title_screen();
         } else if (gameState == STATE_PLAY) {
-            if (superActive) {
-                if (superReserveFrames > 0) superReserveFrames--;
-                else superActive = 0;
-            }
+            u8 tick;
+            for (tick = 0; tick < PLAY_TICKS_PER_FRAME; tick++) {
+                if (superActive) {
+                    if (superReserveFrames > 0) superReserveFrames--;
+                    else superActive = 0;
+                }
 
-            update_ropes();
-            update_player_input(0, pad0, padPrev);
-            update_player_input(1, pad1, padPrev1);
-            move_player(0);
-            move_player(1);
-            resolve_player_stack_collision();
-            update_enemies();
-            update_powerups();
-            update_bolts();
-            handle_pickups_and_hits();
-            update_camera();
-            apply_coop_screen_drag();
+                update_ropes();
+                if (tick == 0) {
+                    update_player_input(0, pad0, padPrev);
+                    update_player_input(1, pad1, padPrev1);
+                } else {
+                    update_player_input(0, pad0, pad0);
+                    update_player_input(1, pad1, pad1);
+                }
+                move_player(0);
+                move_player(1);
+                resolve_player_stack_collision();
+                update_enemies();
+                update_powerups();
+                update_bolts();
+                handle_pickups_and_hits();
+                update_camera();
+                apply_coop_screen_drag();
+            }
             draw_world_background();
 
             sprite_begin();
