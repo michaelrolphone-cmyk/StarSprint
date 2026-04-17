@@ -2,6 +2,7 @@
 #include "assets.h"
 
 extern char tilfont, palfont;
+extern void consoleVblank(void);
 
 #define LEVEL_W 192
 #define LEVEL_H 14
@@ -233,7 +234,7 @@ static u8 is_question(u8 tile);
 #define BG_WORLD_MAP_VRAM_ADDR 0x2000
 #define BG_WORLD_MAP_W 64
 #define BG_WORLD_MAP_H 32
-#define WORLD_BG_TILE_ATTR(tileIndex) ((u16)TILE_ATTR_FULL(0, 0, 0, 0, (tileIndex)))
+#define WORLD_BG_TILE_ATTR(tileIndex) ((u16)(tileIndex))
 #define WORLD_BG_EMPTY_TILE_BASE ((u16)((SPRITE_FRAME_COUNT - 1) * SPRITE_16X16_TILE_COUNT))
 
 static u16 worldBgMap[BG_WORLD_MAP_W * BG_WORLD_MAP_H];

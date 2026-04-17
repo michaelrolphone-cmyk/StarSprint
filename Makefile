@@ -14,9 +14,10 @@ SFILES := $(filter-out hdr.asm,$(SFILES))
 OFILES := $(filter-out hdr.obj,$(OFILES))
 
 # Assets are compiled from src/assets.c for C symbol access. Exclude generated
-# assembler variants to avoid duplicate symbol definitions at link time.
-SFILES := $(filter-out assets.asm assets.asp assets.ps,$(SFILES))
-OFILES := $(filter-out assets.obj,$(OFILES))
+# assembler variants (with or without src/ prefixes) to avoid duplicate
+# symbol definitions at link time.
+SFILES := $(filter-out assets.asm assets.asp assets.ps $(SRC)/assets.asm $(SRC)/assets.asp $(SRC)/assets.ps,$(SFILES))
+OFILES := $(filter-out assets.obj $(SRC)/assets.obj,$(OFILES))
 
 all: $(ROMNAME).sfc
 
