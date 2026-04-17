@@ -23,6 +23,7 @@ class MainLoopTimingTests(unittest.TestCase):
         callback_body = callback_match.group("body")
         self.assertIn("consoleVblank();", callback_body)
         self.assertNotIn("consoleUpdate();", callback_body)
+        self.assertNotIn("oamUpdate();", callback_body)
         self.assertIn("nmiSet(vblank_dma_transfer);", self.source)
 
     def test_main_loop_waits_for_vblank_before_input(self):

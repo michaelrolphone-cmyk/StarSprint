@@ -1941,7 +1941,6 @@ static void set_backdrop_for_state(u8 state) {
 
 static void vblank_dma_transfer(void) {
     consoleVblank();
-    oamUpdate();
 }
 
 static void init_video(void) {
