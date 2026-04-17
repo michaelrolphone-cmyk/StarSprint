@@ -55,6 +55,36 @@ class MainLoopTimingTests(unittest.TestCase):
         self.assertIn("return;", body)
         self.assertIn("playHudDirty = 0;", body)
 
+    def test_non_play_screens_use_text_dirty_flags(self):
+        for fn_name, dirty_flag in [
+            ("draw_title_screen", "titleTextDirty"),
+            ("draw_level_clear_screen", "levelClearTextDirty"),
+            ("draw_all_clear_screen", "allClearTextDirty"),
+        ]:
+            fn = re.search(
+                rf"static void {fn_name}\(void\) \{{(?P<body>.*?)\n\}}",
+                self.source,
+                re.S,
+            )
+            self.assertIsNotNone(fn, f"{fn_name}() not found")
+            body = fn.group("body")
+            self.assertIn(f"if (!{dirty_flag}) return;", body)
+            self.assertIn(f"{dirty_flag} = 0;", body)
+
+    def test_world_map_uses_cache_to_avoid_full_text_redraws(self):
+        fn = re.search(
+            r"static void draw_world_map\(void\) \{(?P<body>.*?)\n\}",
+            self.source,
+            re.S,
+        )
+        self.assertIsNotNone(fn, "draw_world_map() not found")
+        body = fn.group("body")
+        self.assertIn("if (!worldMapTextDirty &&", body)
+        self.assertIn("worldMapCachedSelected == selectedLevel", body)
+        self.assertIn("worldMapCachedCompletedBits == completedBits", body)
+        self.assertIn("worldMapCachedReserveSeconds == reserveSeconds", body)
+        self.assertIn("worldMapTextDirty = 0;", body)
+
     def test_state_change_marks_hud_dirty_after_text_clear(self):
         state_change = re.search(
             r"if \(gameState != lastState\) \{(?P<body>.*?)\n        \}",
@@ -65,6 +95,10 @@ class MainLoopTimingTests(unittest.TestCase):
         body = state_change.group("body")
         self.assertIn("clear_text_screen();", body)
         self.assertIn("playHudDirty = 1;", body)
+        self.assertIn("titleTextDirty = (gameState == STATE_TITLE);", body)
+        self.assertIn("worldMapTextDirty = (gameState == STATE_WORLD_MAP);", body)
+        self.assertIn("levelClearTextDirty = (gameState == STATE_LEVEL_CLEAR);", body)
+        self.assertIn("allClearTextDirty = (gameState == STATE_ALL_CLEAR);", body)
 
     def test_entity_draw_loops_skip_offscreen_sprites_before_emit(self):
         for fn_name, guard in [

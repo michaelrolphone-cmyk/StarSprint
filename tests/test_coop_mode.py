@@ -63,6 +63,14 @@ class CoopModeTests(unittest.TestCase):
         self.assertIn("apply_coop_screen_drag();", body)
         self.assertLess(body.find("update_camera();"), body.find("apply_coop_screen_drag();"))
 
+    def test_camera_tracks_leading_player_for_forward_drag(self):
+        camera_fn = re.search(r"static void update_camera\(void\) \{(?P<body>.*?)\n\}", self.source, re.S)
+        self.assertIsNotNone(camera_fn, "update_camera() not found")
+        body = camera_fn.group("body")
+        self.assertIn("#define COOP_CAMERA_LEAD_OFFSET 112", self.source)
+        self.assertIn("s16 focusX = (player.x > player2.x) ? player.x : player2.x;", body)
+        self.assertIn("s16 target = focusX - COOP_CAMERA_LEAD_OFFSET;", body)
+
 
 if __name__ == "__main__":
     unittest.main()

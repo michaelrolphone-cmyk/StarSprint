@@ -9,6 +9,7 @@ extern char tilfont, palfont;
 #define SCREEN_W 256
 #define SCREEN_H 224
 #define TEXT_ROWS 28
+#define COOP_CAMERA_LEAD_OFFSET 112
 
 #define WORLD_COUNT 3
 #define LEVELS_PER_WORLD 4
@@ -185,6 +186,15 @@ static u8 playHudP1Big = 0xFF;
 static u8 playHudP1Lightning = 0xFF;
 static u8 playHudP2Big = 0xFF;
 static u8 playHudP2Lightning = 0xFF;
+static u8 titleTextDirty = 1;
+static u8 worldMapTextDirty = 1;
+static u8 levelClearTextDirty = 1;
+static u8 allClearTextDirty = 1;
+static u8 worldMapCachedSelected = 0xFF;
+static u16 worldMapCachedCompletedBits = 0xFFFF;
+static u8 worldMapCachedHighestUnlocked = 0xFF;
+static u16 worldMapCachedScore = 0xFFFF;
+static u16 worldMapCachedReserveSeconds = 0xFFFF;
 
 static u8 currentLevel = 0;
 static u8 selectedLevel = 0;
@@ -1330,8 +1340,8 @@ static void handle_pickups_and_hits(void) {
 }
 
 static void update_camera(void) {
-    s16 focusX = (player.x + player2.x) / 2;
-    s16 target = focusX - 96;
+    s16 focusX = (player.x > player2.x) ? player.x : player2.x;
+    s16 target = focusX - COOP_CAMERA_LEAD_OFFSET;
     s16 maxCamera = (LEVEL_W * TILE_SIZE) - SCREEN_W;
     if (target < 0) target = 0;
     if (target > maxCamera) target = maxCamera;
@@ -1561,6 +1571,8 @@ static void draw_title_scene(void) {
 }
 
 static void draw_title_screen(void) {
+    if (!titleTextDirty) return;
+    titleTextDirty = 0;
     consoleDrawText(6, 4, "STARSPRINT");
     consoleDrawText(3, 7, "A SIDE-SCROLLING PLATFORMER");
     consoleDrawText(4, 10, "B JUMPS / RELEASES ROPES");
@@ -1619,12 +1631,29 @@ static void draw_world_map_scene(void) {
 }
 
 static void draw_world_map(void) {
+    u16 reserveSeconds = superReserveFrames / 60;
+    if (!worldMapTextDirty &&
+        worldMapCachedSelected == selectedLevel &&
+        worldMapCachedCompletedBits == completedBits &&
+        worldMapCachedHighestUnlocked == highestUnlocked &&
+        worldMapCachedScore == score &&
+        worldMapCachedReserveSeconds == reserveSeconds) {
+        return;
+    }
+
+    worldMapTextDirty = 0;
+    worldMapCachedSelected = selectedLevel;
+    worldMapCachedCompletedBits = completedBits;
+    worldMapCachedHighestUnlocked = highestUnlocked;
+    worldMapCachedScore = score;
+    worldMapCachedReserveSeconds = reserveSeconds;
+
     u8 row;
     u8 col;
     consoleDrawText(2, 1, "STARSPRINT WORLD MAP");
     consoleDrawText(2, 2, "D-PAD MOVE  START/A PLAY");
     consoleDrawText(2, 3, "CLEAR LEVELS TO UNLOCK MORE");
-    consoleDrawText(2, 4, "BOOST BANK %03us", (u16)(superReserveFrames / 60));
+    consoleDrawText(2, 4, "BOOST BANK %03us", reserveSeconds);
 
     for (row = 0; row < WORLD_COUNT; row++) {
         u8 y = 7 + row * 6;
@@ -1651,6 +1680,8 @@ static void draw_world_map(void) {
 }
 
 static void draw_level_clear_screen(void) {
+    if (!levelClearTextDirty) return;
+    levelClearTextDirty = 0;
     u8 world = (currentLevel / LEVELS_PER_WORLD) + 1;
     u8 stage = (currentLevel % LEVELS_PER_WORLD) + 1;
     consoleDrawText(7, 8, "LEVEL CLEAR!");
@@ -1661,6 +1692,8 @@ static void draw_level_clear_screen(void) {
 }
 
 static void draw_all_clear_screen(void) {
+    if (!allClearTextDirty) return;
+    allClearTextDirty = 0;
     consoleDrawText(7, 7, "ALL WORLDS CLEAR!");
     consoleDrawText(7, 10, "FINAL SCORE %05u", score);
     consoleDrawText(3, 13, "YOU CROSSED EVERY WORLD");
@@ -1781,6 +1814,10 @@ int main(void) {
             clear_text_screen();
             set_backdrop_for_state(gameState);
             playHudDirty = 1;
+            titleTextDirty = (gameState == STATE_TITLE);
+            worldMapTextDirty = (gameState == STATE_WORLD_MAP);
+            levelClearTextDirty = (gameState == STATE_LEVEL_CLEAR);
+            allClearTextDirty = (gameState == STATE_ALL_CLEAR);
             lastState = gameState;
         }
 
