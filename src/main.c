@@ -168,6 +168,15 @@ static u16 pad1 = 0;
 static u16 padPrev = 0;
 static u16 padPrev1 = 0;
 static u8 spriteCount = 0;
+static u8 playHudDirty = 1;
+static u16 playHudScore = 0xFFFF;
+static u8 playHudStars = 0xFF;
+static u16 playHudReserveSeconds = 0xFFFF;
+static u8 playHudSuper = 0xFF;
+static u8 playHudP1Big = 0xFF;
+static u8 playHudP1Lightning = 0xFF;
+static u8 playHudP2Big = 0xFF;
+static u8 playHudP2Lightning = 0xFF;
 
 static u8 currentLevel = 0;
 static u8 selectedLevel = 0;
@@ -1272,38 +1281,50 @@ static void draw_world(void) {
 
 static void draw_stars(void) {
     u8 i;
+    s16 sx;
     for (i = 0; i < MAX_STARS; i++) {
         if (stars[i].active) {
-            sprite_emit(SPR_STAR_SMILE, stars[i].x - cameraX, stars[i].y, 0, 0);
+            sx = stars[i].x - cameraX;
+            if (sx <= -16 || sx >= SCREEN_W) continue;
+            sprite_emit(SPR_STAR_SMILE, sx, stars[i].y, 0, 0);
         }
     }
 }
 
 static void draw_enemies(void) {
     u8 i;
+    s16 sx;
     for (i = 0; i < MAX_ENEMIES; i++) {
         if (enemies[i].active) {
+            sx = enemies[i].x - cameraX;
+            if (sx <= -ENEMY_W || sx >= SCREEN_W) continue;
             sprite_emit(enemies[i].kind == ENEMY_HOP ? SPR_ENEMY_HOPPER : SPR_ENEMY_WALKER,
-                        enemies[i].x - cameraX, enemies[i].y, enemies[i].vx < 0, 0);
+                        sx, enemies[i].y, enemies[i].vx < 0, 0);
         }
     }
 }
 
 static void draw_powerups(void) {
     u8 i;
+    s16 sx;
     for (i = 0; i < MAX_POWERUPS; i++) {
         if (powerups[i].active) {
+            sx = powerups[i].x - cameraX;
+            if (sx <= -POWER_W || sx >= SCREEN_W) continue;
             sprite_emit(powerups[i].type == POWER_GROW ? SPR_GROW_POWER : SPR_LIGHT_POWER,
-                        powerups[i].x - cameraX, powerups[i].y, 0, 0);
+                        sx, powerups[i].y, 0, 0);
         }
     }
 }
 
 static void draw_bolts(void) {
     u8 i;
+    s16 sx;
     for (i = 0; i < MAX_BOLTS; i++) {
         if (bolts[i].active) {
-            sprite_emit(SPR_BOLT, bolts[i].x - cameraX, bolts[i].y, bolts[i].vx < 0, 0);
+            sx = bolts[i].x - cameraX;
+            if (sx <= -BOLT_W || sx >= SCREEN_W) continue;
+            sprite_emit(SPR_BOLT, sx, bolts[i].y, bolts[i].vx < 0, 0);
         }
     }
 }
@@ -1318,9 +1339,12 @@ static void draw_ropes(void) {
             for (seg = 0; seg <= 4; seg++) {
                 s16 sx = ropes[i].anchorX + (dx * seg) / 5 - cameraX - 4;
                 s16 sy = ropes[i].anchorY + (dy * seg) / 5;
+                if (sx <= -16 || sx >= SCREEN_W) continue;
                 sprite_emit(SPR_BOLT, sx, sy, 0, 0);
             }
-            sprite_emit(SPR_STAR_SMILE, ropes[i].x - cameraX, ropes[i].y, 0, 0);
+            if (ropes[i].x - cameraX > -16 && ropes[i].x - cameraX < SCREEN_W) {
+                sprite_emit(SPR_STAR_SMILE, ropes[i].x - cameraX, ropes[i].y, 0, 0);
+            }
         }
     }
 }
@@ -1340,6 +1364,28 @@ static void draw_play_hud(void) {
     u16 reserveSeconds = superReserveFrames / 60;
     u8 world = (currentLevel / LEVELS_PER_WORLD) + 1;
     u8 stage = (currentLevel % LEVELS_PER_WORLD) + 1;
+    if (!playHudDirty &&
+        playHudScore == score &&
+        playHudStars == starsTowardMinute &&
+        playHudReserveSeconds == reserveSeconds &&
+        playHudSuper == superActive &&
+        playHudP1Big == player.big &&
+        playHudP1Lightning == player.lightning &&
+        playHudP2Big == player2.big &&
+        playHudP2Lightning == player2.lightning) {
+        return;
+    }
+
+    playHudDirty = 0;
+    playHudScore = score;
+    playHudStars = starsTowardMinute;
+    playHudReserveSeconds = reserveSeconds;
+    playHudSuper = superActive;
+    playHudP1Big = player.big;
+    playHudP1Lightning = player.lightning;
+    playHudP2Big = player2.big;
+    playHudP2Lightning = player2.lightning;
+
     consoleDrawText(0, 0, BLANK_LINE);
     consoleDrawText(0, 1, BLANK_LINE);
     consoleDrawText(0, 2, BLANK_LINE);
@@ -1598,6 +1644,7 @@ int main(void) {
         if (gameState != lastState) {
             clear_text_screen();
             set_backdrop_for_state(gameState);
+            playHudDirty = 1;
             lastState = gameState;
         }
 
