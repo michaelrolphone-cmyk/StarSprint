@@ -21,7 +21,7 @@ class MainLoopTimingTests(unittest.TestCase):
         )
         self.assertIsNotNone(callback_match, "vblank_dma_transfer() not found")
         callback_body = callback_match.group("body")
-        self.assertIn("consoleVblank();", callback_body)
+        self.assertIn("consoleUpdate();", callback_body)
         self.assertIn("nmiSet(vblank_dma_transfer);", self.source)
 
     def test_main_loop_waits_for_vblank_before_input(self):
