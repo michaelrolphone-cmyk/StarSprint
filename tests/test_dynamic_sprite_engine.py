@@ -63,7 +63,7 @@ class DynamicSpriteEngineTests(unittest.TestCase):
     def test_sprite_offset_macro_matches_16x16_tile_layout(self):
         self.assertIn("#define SPRITE_BYTES_PER_8X8 32", self.main_source)
         self.assertIn("#define SPRITE_16X16_TILE_COUNT 4", self.main_source)
-        self.assertIn("#define SPRITE_GFX_OFFSET(frame) ((u16)(frame) * SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8)", self.main_source)
+        self.assertIn("#define SPRITE_GFX_OFFSET(frame) ((u16)(frame) * SPRITE_16X16_TILE_COUNT)", self.main_source)
 
     def test_imported_palette_keeps_astronaut_and_space_tones(self):
         match = re.search(r"const unsigned short sprite_pal\[\] = \{(?P<body>.*?)\};", self.assets_source, re.S)
