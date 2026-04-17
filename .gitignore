@@ -1,0 +1,9 @@
+# Build outputs
+*.obj
+*.sfc
+linkfile
+
+# Generated temporary assembler outputs from pvsneslib C compilation
+src/assets.ps
+src/assets.asp
+src/assets.asm
