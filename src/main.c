@@ -200,6 +200,7 @@ static u16 worldMapCachedCompletedBits = 0xFFFF;
 static u8 worldMapCachedHighestUnlocked = 0xFF;
 static u16 worldMapCachedScore = 0xFFFF;
 static u16 worldMapCachedReserveSeconds = 0xFFFF;
+static s16 worldBgCachedTx0 = -1;
 
 static u8 currentLevel = 0;
 static u8 selectedLevel = 0;
@@ -489,6 +490,7 @@ static void build_level(u8 levelIndex) {
     clear_world();
     reset_entities();
     build_base_floor();
+    worldBgCachedTx0 = -1;
 
     world = levelIndex / LEVELS_PER_WORLD;
     stage = levelIndex % LEVELS_PER_WORLD;
@@ -1530,21 +1532,27 @@ static void sprite_end(void) {
 
 static void draw_world_background(void) {
     s16 tx0 = cameraX / TILE_SIZE;
+    s16 fineScrollX = cameraX & (TILE_SIZE - 1);
     s16 tx;
     s16 ty;
-    clear_world_bg_map();
 
-    for (ty = 0; ty < LEVEL_H; ty++) {
-        for (tx = 0; tx < (SCREEN_W / TILE_SIZE); tx++) {
-            s16 worldTx = tx0 + tx;
-            u8 tile = tile_at(worldTx, ty);
-            if (tile == TILE_EMPTY) continue;
-            world_bg_put_16x16((u8)(tx * 2), (u8)(ty * 2), world_bg_tile_base(tile));
+    if (tx0 != worldBgCachedTx0) {
+        clear_world_bg_map();
+
+        for (ty = 0; ty < LEVEL_H; ty++) {
+            for (tx = 0; tx <= (SCREEN_W / TILE_SIZE); tx++) {
+                s16 worldTx = tx0 + tx;
+                u8 tile = tile_at(worldTx, ty);
+                if (tile == TILE_EMPTY) continue;
+                world_bg_put_16x16((u8)(tx * 2), (u8)(ty * 2), world_bg_tile_base(tile));
+            }
         }
+
+        bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);
+        worldBgCachedTx0 = tx0;
     }
 
-    bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);
-    bgSetScroll(1, 0, 0);
+    bgSetScroll(1, fineScrollX, 0);
 }
 
 static void draw_level_parallax_background(void) {
@@ -1957,6 +1965,7 @@ static void init_video(void) {
     bgInitTileSet(1, (u8 *)sprite_tiles, (u8 *)sprite_pal, 0, SPRITE_TILES_LEN, SPRITE_PAL_LEN, BG_16COLORS, BG_WORLD_TILE_VRAM_ADDR);
     clear_world_bg_map();
     bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);
+    worldBgCachedTx0 = -1;
 
     oamInitGfxSet((u8 *)sprite_tiles, SPRITE_TILES_LEN, (u8 *)sprite_pal, SPRITE_PAL_LEN, 0, SPRITE_GFX_VRAM_ADDR, OBJ_SIZE16_L32);
 
