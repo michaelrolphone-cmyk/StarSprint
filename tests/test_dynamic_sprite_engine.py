@@ -27,7 +27,7 @@ class DynamicSpriteEngineTests(unittest.TestCase):
         self.assertIn("static u16 worldBgMap[BG_WORLD_MAP_W * BG_WORLD_MAP_H];", self.main_source)
         self.assertIn("static void draw_world_background(void)", self.main_source)
         self.assertIn("#define SPRITE_FRAME_COUNT (SPRITE_TILES_LEN / (SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8))", self.main_source)
-        self.assertIn("#define WORLD_BG_TILE_ATTR(tileIndex) ((u16)(BG_TIL_NUM(tileIndex) | BG_TIL_PAL(0)))", self.main_source)
+        self.assertIn("#define WORLD_BG_TILE_ATTR(tileIndex) ((u16)TILE_ATTR_FULL(0, 0, 0, 0, (tileIndex)))", self.main_source)
         self.assertIn("#define WORLD_BG_EMPTY_TILE_BASE ((u16)((SPRITE_FRAME_COUNT - 1) * SPRITE_16X16_TILE_COUNT))", self.main_source)
         self.assertIn("bgInitTileSet(1, (u8 *)sprite_tiles, (u8 *)sprite_pal, 0, SPRITE_TILES_LEN, SPRITE_PAL_LEN, BG_16COLORS, BG_WORLD_TILE_VRAM_ADDR);", self.main_source)
         self.assertIn("bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);", self.main_source)
