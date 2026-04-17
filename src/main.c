@@ -47,6 +47,9 @@ extern char tilfont, palfont;
 #define JUMP_VELOCITY -12
 #define GRAVITY 1
 #define MAX_FALL 12
+#define SMASH_FALL_MAX 18
+#define SMASH_BOUNCE_DISTANCE 24
+#define SMASH_BOUNCE_UPWARD -9
 #define ROPE_PHASE_COUNT 15
 #define ROPE_REGRAB_COOLDOWN 8
 
@@ -1011,8 +1014,10 @@ static void move_player(u8 playerIndex) {
         if (p->vy < (MAX_FALL / 2)) p->vy += GRAVITY;
         if (p->vy > (MAX_FALL / 2)) p->vy = (MAX_FALL / 2);
     } else {
-        if (p->vy < MAX_FALL) p->vy += GRAVITY;
-        if (p->vy > MAX_FALL) p->vy = MAX_FALL;
+        s16 maxFall = p->smash ? SMASH_FALL_MAX : MAX_FALL;
+        if (p->vy < maxFall) p->vy += GRAVITY;
+        if (p->smash && p->vy > 0 && (p->y & 1) == 0) p->vy++;
+        if (p->vy > maxFall) p->vy = maxFall;
     }
 
     if (p->invuln) p->invuln--;
@@ -1095,6 +1100,86 @@ static void move_player(u8 playerIndex) {
     }
 
     if (p->y + h >= SCREEN_H && p->vy == 0) p->onGround = 1;
+}
+
+static void bounce_player_from_smash(Player *launched, const Player *source) {
+    s16 launchedH;
+    s16 checkTx = 0;
+    s16 checkTy = 0;
+    s16 sourceCenter = source->x + (PLAYER_W / 2);
+    s16 launchedCenter = launched->x + (PLAYER_W / 2);
+    s16 direction = (launchedCenter >= sourceCenter) ? 1 : -1;
+    s16 originalX = launched->x;
+    s16 targetX;
+
+    if (sourceCenter == launchedCenter) {
+        direction = source->facingLeft ? -1 : 1;
+    }
+
+    targetX = launched->x + (direction * SMASH_BOUNCE_DISTANCE);
+    if (targetX < 0) targetX = 0;
+    if (targetX > (LEVEL_W * TILE_SIZE) - PLAYER_W) targetX = (LEVEL_W * TILE_SIZE) - PLAYER_W;
+
+    launchedH = player_height(launched);
+    launched->x = targetX;
+    while (launched->x != originalX && rect_collide_tile(launched->x, launched->y, PLAYER_W, launchedH, &checkTx, &checkTy)) {
+        launched->x -= direction;
+    }
+
+    launched->vx = direction * SPEED_RUN;
+    launched->vy = SMASH_BOUNCE_UPWARD;
+    launched->onGround = 0;
+    launched->wallHolding = 0;
+    launched->wallSide = 0;
+    launched->wantsWallGrab = 0;
+    launched->sliding = 0;
+    launched->slideMomentum = 0;
+    launched->slideMaxMomentum = 0;
+}
+
+static void resolve_player_head_stand(Player *rider, Player *base) {
+    s16 riderH;
+    s16 riderBottom;
+    s16 baseH;
+    s16 baseTop;
+    s16 baseBottom;
+    s16 overlapLeft;
+    s16 overlapRight;
+
+    if (rider->heldBy < MAX_PLAYERS) return;
+    if (base->heldBy < MAX_PLAYERS) return;
+    if (rider->onRope || base->onRope) return;
+    if (rider->vy < 0) return;
+
+    riderH = player_height(rider);
+    baseH = player_height(base);
+    riderBottom = rider->y + riderH;
+    baseTop = base->y;
+    baseBottom = base->y + baseH;
+
+    overlapLeft = rider->x;
+    if (base->x > overlapLeft) overlapLeft = base->x;
+    overlapRight = rider->x + PLAYER_W;
+    if ((base->x + PLAYER_W) < overlapRight) overlapRight = base->x + PLAYER_W;
+    if ((overlapRight - overlapLeft) < 6) return;
+
+    if (riderBottom < baseTop - 2) return;
+    if (riderBottom > baseTop + 6) return;
+    if (rider->y >= base->y) return;
+    if (rider->y >= baseBottom) return;
+
+    rider->y = baseTop - riderH;
+    rider->vy = 0;
+    rider->onGround = 1;
+
+    if (rider->smash) {
+        bounce_player_from_smash(base, rider);
+    }
+}
+
+static void resolve_player_stack_collision(void) {
+    resolve_player_head_stand(&players[0], &players[1]);
+    resolve_player_head_stand(&players[1], &players[0]);
 }
 
 static u8 enemy_floor_ahead(const Enemy *enemy) {
@@ -1859,6 +1944,7 @@ int main(void) {
             update_player_input(1, pad1, padPrev1);
             move_player(0);
             move_player(1);
+            resolve_player_stack_collision();
             update_enemies();
             update_powerups();
             update_bolts();
