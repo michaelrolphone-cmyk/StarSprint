@@ -24,15 +24,21 @@ class DynamicSpriteEngineTests(unittest.TestCase):
         self.assertIn("oamSetEx(oamId, OBJ_SMALL, OBJ_SHOW);", body)
 
     def test_world_tiles_render_with_bg_tilemap_instead_of_oam_budget(self):
+        self.assertIn("#define BG_WORLD_MAP_W 64", self.main_source)
         self.assertIn("static u16 worldBgMap[BG_WORLD_MAP_W * BG_WORLD_MAP_H];", self.main_source)
         self.assertIn("static void draw_world_background(void)", self.main_source)
         self.assertIn("#define SPRITE_FRAME_COUNT (SPRITE_TILES_LEN / (SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8))", self.main_source)
         self.assertIn("#define WORLD_BG_TILE_ATTR(tileIndex) ((u16)TILE_ATTR_FULL(0, 0, 0, 0, (tileIndex)))", self.main_source)
         self.assertIn("#define WORLD_BG_EMPTY_TILE_BASE ((u16)((SPRITE_FRAME_COUNT - 1) * SPRITE_16X16_TILE_COUNT))", self.main_source)
         self.assertIn("bgInitTileSet(1, (u8 *)sprite_tiles, (u8 *)sprite_pal, 0, SPRITE_TILES_LEN, SPRITE_PAL_LEN, BG_16COLORS, BG_WORLD_TILE_VRAM_ADDR);", self.main_source)
-        self.assertIn("bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);", self.main_source)
+        self.assertIn("bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_64x32, BG_WORLD_MAP_VRAM_ADDR);", self.main_source)
         self.assertIn("draw_world_background();", self.main_source)
         self.assertNotIn("draw_world();", self.main_source)
+
+    def test_bg_map_size_matches_17_visible_tiles_as_16x16_quads(self):
+        self.assertIn("for (tx = 0; tx <= (SCREEN_W / TILE_SIZE); tx++) {", self.main_source)
+        self.assertIn("#define BG_WORLD_MAP_W 64", self.main_source)
+        self.assertIn("bgSetMapPtr(1, BG_WORLD_MAP_VRAM_ADDR, SC_64x32);", self.main_source)
 
     def test_world_tilemap_uses_tile_attributes_for_all_quadrants(self):
         fn = re.search(r"static void world_bg_put_16x16\(u8 mx, u8 my, u16 tileBase\) \{(?P<body>.*?)\n\}", self.main_source, re.S)
