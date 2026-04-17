@@ -17,6 +17,12 @@ class SpriteAssetsTests(unittest.TestCase):
         tiles = self._parse_hex_array("sprite_tiles")
         self.assertEqual(len(tiles), 2048, "sprite_tiles must remain 2048 bytes for 16 frames")
 
+    def test_last_sprite_frame_is_blank_for_bg_tilemap_clear(self):
+        tiles = self._parse_hex_array("sprite_tiles")
+        frame_size = 4 * 32  # 16x16 frame == four 8x8 tiles.
+        blank_frame = tiles[-frame_size:]
+        self.assertTrue(all(value == 0 for value in blank_frame), "last 16x16 frame must stay blank for BG clear tiles")
+
     def test_sprite_palette_uses_all_16_entries(self):
         palette = self._parse_hex_array("sprite_pal")
         self.assertEqual(len(palette), 16, "sprite_pal must contain 16 SNES colors")

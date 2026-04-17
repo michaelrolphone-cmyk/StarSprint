@@ -8,7 +8,7 @@ class ParallaxBackgroundTests(unittest.TestCase):
     def setUpClass(cls):
         cls.source = Path("src/main.c").read_text()
 
-    def test_play_state_draws_parallax_before_world_geometry(self):
+    def test_play_state_draws_parallax_before_dynamic_entity_sprites(self):
         play_branch = re.search(
             r"else if \(gameState == STATE_PLAY\) \{(?P<body>.*?)\n        \} else if \(gameState == STATE_WORLD_MAP\)",
             self.source,
@@ -17,7 +17,8 @@ class ParallaxBackgroundTests(unittest.TestCase):
         self.assertIsNotNone(play_branch, "play-state branch not found")
         body = play_branch.group("body")
         self.assertIn("draw_level_parallax_background();", body)
-        self.assertLess(body.find("draw_level_parallax_background();"), body.find("draw_world();"))
+        self.assertNotIn("draw_world();", body)
+        self.assertLess(body.find("draw_level_parallax_background();"), body.find("draw_stars();"))
 
     def test_parallax_function_has_cloud_mountain_tree_layers_with_distinct_speeds(self):
         fn = re.search(
