@@ -99,6 +99,9 @@ typedef struct {
     u8 wallHolding;
     s8 wallSide;
     u8 wantsWallGrab;
+    u8 sliding;
+    s16 slideMomentum;
+    s16 slideMaxMomentum;
     u8 holding;
     u8 heldBy;
 } Player;
@@ -523,6 +526,9 @@ static void reset_player_position(void) {
     player.wallHolding = 0;
     player.wallSide = 0;
     player.wantsWallGrab = 0;
+    player.sliding = 0;
+    player.slideMomentum = 0;
+    player.slideMaxMomentum = 0;
     player.holding = 255;
     player.heldBy = 255;
 
@@ -540,6 +546,9 @@ static void reset_player_position(void) {
     player2.wallHolding = 0;
     player2.wallSide = 0;
     player2.wantsWallGrab = 0;
+    player2.sliding = 0;
+    player2.slideMomentum = 0;
+    player2.slideMaxMomentum = 0;
     player2.holding = 255;
     player2.heldBy = 255;
     cameraX = 0;
@@ -781,6 +790,7 @@ static void update_player_input(u8 playerIndex, u16 padCur, u16 padOld) {
     u8 yHeld = (padCur & KEY_Y) ? 1 : 0;
     u8 aHeld = (padCur & KEY_A) ? 1 : 0;
     u8 aPressed = ((padCur & KEY_A) && !(padOld & KEY_A));
+    u8 downPressed = ((padCur & KEY_DOWN) && !(padOld & KEY_DOWN));
     s16 maxSpeed;
 
     if (playerIndex == 0) {
@@ -863,6 +873,30 @@ static void update_player_input(u8 playerIndex, u16 padCur, u16 padOld) {
         return;
     }
 
+    if (p->sliding) {
+        if (!p->onGround || p->slideMomentum <= 0) {
+            p->sliding = 0;
+            p->slideMomentum = 0;
+            p->slideMaxMomentum = 0;
+        } else {
+            s16 speed;
+            if (p->slideMaxMomentum <= 0) p->slideMaxMomentum = p->slideMomentum;
+            speed = (p->slideMomentum * maxSpeed + (p->slideMaxMomentum - 1)) / p->slideMaxMomentum;
+            if (speed < 1) speed = 1;
+            p->vx = p->facingLeft ? -speed : speed;
+            if (jumpPressed) {
+                p->sliding = 0;
+                p->slideMomentum = 0;
+                p->slideMaxMomentum = 0;
+                p->vy = JUMP_VELOCITY;
+                p->onGround = 0;
+            }
+            p->smash = 0;
+            if (aPressed && p->lightning) fire_bolt(p);
+            return;
+        }
+    }
+
     if (padCur & KEY_LEFT) {
         p->vx--;
         if (p->vx < -maxSpeed) p->vx = -maxSpeed;
@@ -874,6 +908,14 @@ static void update_player_input(u8 playerIndex, u16 padCur, u16 padOld) {
     } else {
         if (p->vx > 0) p->vx--;
         if (p->vx < 0) p->vx++;
+    }
+
+    if (downPressed && p->onGround && (p->vx >= SPEED_RUN || p->vx <= -SPEED_RUN)) {
+        p->sliding = 1;
+        p->slideMaxMomentum = superActive ? (TILE_SIZE * 4) : (TILE_SIZE * 2);
+        p->slideMomentum = p->slideMaxMomentum;
+        if (p->vx < 0) p->facingLeft = 1;
+        if (p->vx > 0) p->facingLeft = 0;
     }
 
     if (jumpPressed && p->onGround) {
@@ -961,8 +1003,10 @@ static void move_player(u8 playerIndex) {
             while (remainingX != 0) {
                 if (!rect_collide_tile(p->x + step, p->y, PLAYER_W, h, &hitTx, &hitTy)) {
                     p->x += step;
+                    if (p->sliding && p->slideMomentum > 0) p->slideMomentum--;
                     remainingX -= step;
                 } else if (try_player_tunnel_step(p, step, h)) {
+                    if (p->sliding && p->slideMomentum > 0) p->slideMomentum--;
                     remainingX -= step;
                 } else {
                     if (p->wantsWallGrab && !p->onGround && !p->wallHolding) {
@@ -971,6 +1015,9 @@ static void move_player(u8 playerIndex) {
                         p->vy = 0;
                     }
                     p->vx = 0;
+                    p->sliding = 0;
+                    p->slideMomentum = 0;
+                    p->slideMaxMomentum = 0;
                     break;
                 }
             }
@@ -1019,6 +1066,11 @@ static void move_player(u8 playerIndex) {
 
     if (p->x < 0) p->x = 0;
     if (p->x > (LEVEL_W * TILE_SIZE) - PLAYER_W) p->x = (LEVEL_W * TILE_SIZE) - PLAYER_W;
+    if (p->sliding && p->slideMomentum <= 0) {
+        p->sliding = 0;
+        p->slideMaxMomentum = 0;
+        p->vx = 0;
+    }
 
     if (p->y + h >= SCREEN_H && p->vy == 0) p->onGround = 1;
 }
@@ -1275,6 +1327,17 @@ static void update_camera(void) {
     cameraX = (u16)target;
 }
 
+static void apply_coop_screen_drag(void) {
+    u8 i;
+    s16 leftEdge = (s16)cameraX;
+    for (i = 0; i < MAX_PLAYERS; i++) {
+        if (players[i].x < leftEdge) {
+            players[i].x = leftEdge;
+            if (players[i].vx < 0) players[i].vx = 0;
+        }
+    }
+}
+
 static void sprite_begin(void) {
     spriteCount = 0;
 }
@@ -1452,7 +1515,7 @@ static void draw_play_hud(void) {
     consoleDrawText(1, 4, "P1 %s  P2 %s",
         player.lightning ? "LIT" : (player.big ? "BIG" : "SML"),
         player2.lightning ? "LIT" : (player2.big ? "BIG" : "SML"));
-    consoleDrawText(1, 26, "B JUMP  A RUN/FIRE  Y PICKUP/WALL");
+    consoleDrawText(1, 26, "B JUMP A RUN/FIRE Y WALL DOWN SLD");
 }
 
 static void draw_title_scene(void) {
@@ -1488,7 +1551,8 @@ static void draw_title_screen(void) {
     consoleDrawText(3, 14, "HOLD Y TO SLIDE WALLS SLOWLY");
     consoleDrawText(4, 16, "B WALL-JUMPS ONLY AWAY");
     consoleDrawText(4, 18, "A RUNS, USES BOOST, AND FIRES");
-    consoleDrawText(4, 20, "DOWN SMASHES BRICKS UNDERFOOT");
+    consoleDrawText(3, 20, "DOWN IN AIR: SMASH BRICKS");
+    consoleDrawText(3, 21, "DOWN WHILE RUNNING: SLIDE");
     consoleDrawText(5, 22, "COLLECT 60 STARS FOR");
     consoleDrawText(7, 23, "1 MINUTE OF BOOST");
     consoleDrawText(5, 25, "PRESS START FOR MAP");
@@ -1725,6 +1789,7 @@ int main(void) {
             update_bolts();
             handle_pickups_and_hits();
             update_camera();
+            apply_coop_screen_drag();
 
             sprite_begin();
             draw_world();

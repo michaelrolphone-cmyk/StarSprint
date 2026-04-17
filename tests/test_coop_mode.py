@@ -32,7 +32,27 @@ class CoopModeTests(unittest.TestCase):
         self.assertIn("p->vy = JUMP_VELOCITY;", body)
 
     def test_hud_mentions_pickup_throw_control(self):
-        self.assertIn('"B JUMP  A RUN/FIRE  Y PICKUP/WALL"', self.source)
+        self.assertIn('"B JUMP A RUN/FIRE Y WALL DOWN SLD"', self.source)
+
+    def test_camera_drag_pulls_players_to_left_screen_edge(self):
+        drag_fn = re.search(r"static void apply_coop_screen_drag\(void\) \{(?P<body>.*?)\n\}", self.source, re.S)
+        self.assertIsNotNone(drag_fn, "apply_coop_screen_drag() not found")
+        body = drag_fn.group("body")
+        self.assertIn("if (players[i].x < leftEdge)", body)
+        self.assertIn("players[i].x = leftEdge;", body)
+        self.assertIn("if (players[i].vx < 0) players[i].vx = 0;", body)
+
+    def test_play_loop_applies_screen_drag_after_camera_update(self):
+        play_state = re.search(
+            r"else if \(gameState == STATE_PLAY\) \{(?P<body>.*?)\n        \}",
+            self.source,
+            re.S,
+        )
+        self.assertIsNotNone(play_state, "STATE_PLAY branch not found")
+        body = play_state.group("body")
+        self.assertIn("update_camera();", body)
+        self.assertIn("apply_coop_screen_drag();", body)
+        self.assertLess(body.find("update_camera();"), body.find("apply_coop_screen_drag();"))
 
 
 if __name__ == "__main__":
