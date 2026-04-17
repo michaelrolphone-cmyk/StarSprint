@@ -221,10 +221,56 @@ static const u16 uiTextPal[16] = {
     0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF
 };
 
+static u8 is_question(u8 tile);
+
 #define SPRITE_GFX_VRAM_ADDR 0x0000
 #define SPRITE_BYTES_PER_8X8 32
 #define SPRITE_16X16_TILE_COUNT 4
 #define SPRITE_GFX_OFFSET(frame) ((u16)(frame) * SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8)
+#define BG_WORLD_TILE_VRAM_ADDR 0x1000
+#define BG_WORLD_MAP_VRAM_ADDR 0x2000
+#define BG_WORLD_MAP_W 32
+#define BG_WORLD_MAP_H 32
+
+static u16 worldBgMap[BG_WORLD_MAP_W * BG_WORLD_MAP_H];
+
+static void clear_world_bg_map(void) {
+    u16 i;
+    for (i = 0; i < BG_WORLD_MAP_W * BG_WORLD_MAP_H; i++) {
+        worldBgMap[i] = 0;
+    }
+}
+
+static u16 world_bg_tile_base(u8 tile) {
+    u8 frame = SPR_GROUND;
+    if (is_question(tile)) tile = TILE_BRICK;
+    switch (tile) {
+        case TILE_GROUND:
+            frame = SPR_GROUND;
+            break;
+        case TILE_BRICK:
+            frame = SPR_BRICK;
+            break;
+        case TILE_USED:
+            frame = SPR_USED_BLOCK;
+            break;
+        case TILE_SPIKES:
+            frame = SPR_SPIKES;
+            break;
+        default:
+            frame = SPR_GROUND;
+            break;
+    }
+    return (u16)(frame * SPRITE_16X16_TILE_COUNT);
+}
+
+static void world_bg_put_16x16(u8 mx, u8 my, u16 tileBase) {
+    u16 row = my * BG_WORLD_MAP_W;
+    worldBgMap[row + mx] = tileBase;
+    worldBgMap[row + mx + 1] = tileBase + 1;
+    worldBgMap[row + BG_WORLD_MAP_W + mx] = tileBase + 2;
+    worldBgMap[row + BG_WORLD_MAP_W + mx + 1] = tileBase + 3;
+}
 static void clear_text_screen(void) {
     u8 y;
     for (y = 0; y < TEXT_ROWS; y++) {
@@ -1479,38 +1525,23 @@ static void sprite_end(void) {
     }
 }
 
-static void draw_world(void) {
+static void draw_world_background(void) {
     s16 tx0 = cameraX / TILE_SIZE;
-    s16 tx1 = tx0 + (SCREEN_W / TILE_SIZE) + 2;
-    s16 tx, ty;
-    u8 tile;
-    if (tx1 >= LEVEL_W) tx1 = LEVEL_W - 1;
+    s16 tx;
+    s16 ty;
+    clear_world_bg_map();
 
     for (ty = 0; ty < LEVEL_H; ty++) {
-        for (tx = tx0; tx <= tx1; tx++) {
-            tile = tile_at(tx, ty);
+        for (tx = 0; tx < (SCREEN_W / TILE_SIZE); tx++) {
+            s16 worldTx = tx0 + tx;
+            u8 tile = tile_at(worldTx, ty);
             if (tile == TILE_EMPTY) continue;
-
-            if (is_question(tile)) tile = TILE_BRICK;
-
-            switch (tile) {
-                case TILE_GROUND:
-                    sprite_emit(SPR_GROUND, tx * TILE_SIZE - cameraX, ty * TILE_SIZE, 0, 0);
-                    break;
-                case TILE_BRICK:
-                    sprite_emit(SPR_BRICK, tx * TILE_SIZE - cameraX, ty * TILE_SIZE, 0, 0);
-                    break;
-                case TILE_USED:
-                    sprite_emit(SPR_USED_BLOCK, tx * TILE_SIZE - cameraX, ty * TILE_SIZE, 0, 0);
-                    break;
-                case TILE_SPIKES:
-                    sprite_emit(SPR_SPIKES, tx * TILE_SIZE - cameraX, ty * TILE_SIZE, 0, 0);
-                    break;
-                default:
-                    break;
-            }
+            world_bg_put_16x16((u8)(tx * 2), (u8)(ty * 2), world_bg_tile_base(tile));
         }
     }
+
+    bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);
+    bgSetScroll(1, 0, 0);
 }
 
 static void draw_stars(void) {
@@ -1874,9 +1905,15 @@ static void init_video(void) {
 
     bgSetGfxPtr(0, 0x3000);
     bgSetMapPtr(0, 0x6800, SC_32x32);
+    bgSetGfxPtr(1, BG_WORLD_TILE_VRAM_ADDR);
+    bgSetMapPtr(1, BG_WORLD_MAP_VRAM_ADDR, SC_32x32);
     setMode(BG_MODE1, 0);
     bgSetDisable(1);
     bgSetDisable(2);
+
+    bgInitTileSet(1, (u8 *)sprite_tiles, (u8 *)sprite_pal, 0, SPRITE_TILES_LEN, SPRITE_PAL_LEN, BG_16COLORS, BG_WORLD_TILE_VRAM_ADDR);
+    clear_world_bg_map();
+    bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);
 
     oamInitGfxSet((u8 *)sprite_tiles, SPRITE_TILES_LEN, (u8 *)sprite_pal, SPRITE_PAL_LEN, 0, SPRITE_GFX_VRAM_ADDR, OBJ_SIZE16_L32);
 
@@ -1904,6 +1941,8 @@ int main(void) {
         if (gameState != lastState) {
             clear_text_screen();
             set_backdrop_for_state(gameState);
+            if (gameState == STATE_PLAY) bgSetEnable(1);
+            else bgSetDisable(1);
             playHudDirty = 1;
             titleTextDirty = (gameState == STATE_TITLE);
             worldMapTextDirty = (gameState == STATE_WORLD_MAP);
@@ -1936,9 +1975,9 @@ int main(void) {
             handle_pickups_and_hits();
             update_camera();
             apply_coop_screen_drag();
+            draw_world_background();
 
             sprite_begin();
-            draw_world();
             draw_stars();
             draw_powerups();
             draw_enemies();

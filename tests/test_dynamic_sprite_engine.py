@@ -23,6 +23,14 @@ class DynamicSpriteEngineTests(unittest.TestCase):
         self.assertIn("oamSet(oamId, sx, sy, 3, hflip ? 1 : 0, 0, SPRITE_GFX_OFFSET(frame), pal & 0x07);", body)
         self.assertIn("oamSetEx(oamId, OBJ_SMALL, OBJ_SHOW);", body)
 
+    def test_world_tiles_render_with_bg_tilemap_instead_of_oam_budget(self):
+        self.assertIn("static u16 worldBgMap[BG_WORLD_MAP_W * BG_WORLD_MAP_H];", self.main_source)
+        self.assertIn("static void draw_world_background(void)", self.main_source)
+        self.assertIn("bgInitTileSet(1, (u8 *)sprite_tiles, (u8 *)sprite_pal, 0, SPRITE_TILES_LEN, SPRITE_PAL_LEN, BG_16COLORS, BG_WORLD_TILE_VRAM_ADDR);", self.main_source)
+        self.assertIn("bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);", self.main_source)
+        self.assertIn("draw_world_background();", self.main_source)
+        self.assertNotIn("draw_world();", self.main_source)
+
     def test_frame_lifecycle_updates_oam_without_dynamic_upload_queue(self):
         self.assertIn("oamUpdate();", self.main_source)
         self.assertNotIn("oamVramQueueUpdate();", self.main_source)
