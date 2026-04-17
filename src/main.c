@@ -1462,6 +1462,8 @@ int main(void) {
     player.lightning = 0;
 
     while (1) {
+        WaitForVBlank();
+        scanPads();
         padPrev = pad0;
         pad0 = padsCurrent(0);
 
@@ -1520,7 +1522,6 @@ int main(void) {
             draw_all_clear_screen();
         }
 
-        WaitForVBlank();
     }
 
     return 0;

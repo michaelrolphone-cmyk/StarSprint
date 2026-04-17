@@ -43,3 +43,11 @@ make
 ```
 
 The ROM output is `starsprint.sfc`.
+
+## Test
+
+Run the timing regression tests with:
+
+```sh
+python3 -m unittest discover -s tests -p 'test_*.py'
+```
