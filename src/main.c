@@ -227,17 +227,20 @@ static u8 is_question(u8 tile);
 #define SPRITE_BYTES_PER_8X8 32
 #define SPRITE_16X16_TILE_COUNT 4
 #define SPRITE_GFX_OFFSET(frame) ((u16)(frame) * SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8)
+#define SPRITE_FRAME_COUNT (SPRITE_TILES_LEN / (SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8))
 #define BG_WORLD_TILE_VRAM_ADDR 0x1000
 #define BG_WORLD_MAP_VRAM_ADDR 0x2000
 #define BG_WORLD_MAP_W 32
 #define BG_WORLD_MAP_H 32
+#define WORLD_BG_TILE_ATTR(tileIndex) TILE_ATTR_FULL(0, 0, 0, 0, (tileIndex))
+#define WORLD_BG_EMPTY_TILE_BASE ((u16)((SPRITE_FRAME_COUNT - 1) * SPRITE_16X16_TILE_COUNT))
 
 static u16 worldBgMap[BG_WORLD_MAP_W * BG_WORLD_MAP_H];
 
 static void clear_world_bg_map(void) {
     u16 i;
     for (i = 0; i < BG_WORLD_MAP_W * BG_WORLD_MAP_H; i++) {
-        worldBgMap[i] = 0;
+        worldBgMap[i] = WORLD_BG_TILE_ATTR(WORLD_BG_EMPTY_TILE_BASE);
     }
 }
 
@@ -266,10 +269,10 @@ static u16 world_bg_tile_base(u8 tile) {
 
 static void world_bg_put_16x16(u8 mx, u8 my, u16 tileBase) {
     u16 row = my * BG_WORLD_MAP_W;
-    worldBgMap[row + mx] = tileBase;
-    worldBgMap[row + mx + 1] = tileBase + 1;
-    worldBgMap[row + BG_WORLD_MAP_W + mx] = tileBase + 2;
-    worldBgMap[row + BG_WORLD_MAP_W + mx + 1] = tileBase + 3;
+    worldBgMap[row + mx] = WORLD_BG_TILE_ATTR(tileBase);
+    worldBgMap[row + mx + 1] = WORLD_BG_TILE_ATTR(tileBase + 1);
+    worldBgMap[row + BG_WORLD_MAP_W + mx] = WORLD_BG_TILE_ATTR(tileBase + 2);
+    worldBgMap[row + BG_WORLD_MAP_W + mx + 1] = WORLD_BG_TILE_ATTR(tileBase + 3);
 }
 static void clear_text_screen(void) {
     u8 y;
@@ -2020,7 +2023,6 @@ int main(void) {
 
             sprite_begin();
             draw_level_parallax_background();
-            draw_world();
             draw_stars();
             draw_powerups();
             draw_enemies();

@@ -26,10 +26,28 @@ class DynamicSpriteEngineTests(unittest.TestCase):
     def test_world_tiles_render_with_bg_tilemap_instead_of_oam_budget(self):
         self.assertIn("static u16 worldBgMap[BG_WORLD_MAP_W * BG_WORLD_MAP_H];", self.main_source)
         self.assertIn("static void draw_world_background(void)", self.main_source)
+        self.assertIn("#define SPRITE_FRAME_COUNT (SPRITE_TILES_LEN / (SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8))", self.main_source)
+        self.assertIn("#define WORLD_BG_TILE_ATTR(tileIndex) TILE_ATTR_FULL(0, 0, 0, 0, (tileIndex))", self.main_source)
+        self.assertIn("#define WORLD_BG_EMPTY_TILE_BASE ((u16)((SPRITE_FRAME_COUNT - 1) * SPRITE_16X16_TILE_COUNT))", self.main_source)
         self.assertIn("bgInitTileSet(1, (u8 *)sprite_tiles, (u8 *)sprite_pal, 0, SPRITE_TILES_LEN, SPRITE_PAL_LEN, BG_16COLORS, BG_WORLD_TILE_VRAM_ADDR);", self.main_source)
         self.assertIn("bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);", self.main_source)
         self.assertIn("draw_world_background();", self.main_source)
         self.assertNotIn("draw_world();", self.main_source)
+
+    def test_world_tilemap_uses_tile_attributes_for_all_quadrants(self):
+        fn = re.search(r"static void world_bg_put_16x16\(u8 mx, u8 my, u16 tileBase\) \{(?P<body>.*?)\n\}", self.main_source, re.S)
+        self.assertIsNotNone(fn, "world_bg_put_16x16() not found")
+        body = fn.group("body")
+        self.assertIn("worldBgMap[row + mx] = WORLD_BG_TILE_ATTR(tileBase);", body)
+        self.assertIn("worldBgMap[row + mx + 1] = WORLD_BG_TILE_ATTR(tileBase + 1);", body)
+        self.assertIn("worldBgMap[row + BG_WORLD_MAP_W + mx] = WORLD_BG_TILE_ATTR(tileBase + 2);", body)
+        self.assertIn("worldBgMap[row + BG_WORLD_MAP_W + mx + 1] = WORLD_BG_TILE_ATTR(tileBase + 3);", body)
+
+    def test_world_bg_map_clear_uses_blank_tile_not_tile_zero(self):
+        fn = re.search(r"static void clear_world_bg_map\(void\) \{(?P<body>.*?)\n\}", self.main_source, re.S)
+        self.assertIsNotNone(fn, "clear_world_bg_map() not found")
+        body = fn.group("body")
+        self.assertIn("worldBgMap[i] = WORLD_BG_TILE_ATTR(WORLD_BG_EMPTY_TILE_BASE);", body)
 
     def test_frame_lifecycle_updates_oam_without_dynamic_upload_queue(self):
         self.assertIn("oamUpdate();", self.main_source)
