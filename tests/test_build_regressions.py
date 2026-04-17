@@ -7,6 +7,7 @@ class BuildRegressionTests(unittest.TestCase):
     def setUpClass(cls):
         cls.makefile = Path("Makefile").read_text()
         cls.main_source = Path("src/main.c").read_text()
+        cls.gitignore = Path(".gitignore").read_text()
 
     def test_makefile_filters_generated_asset_sources_with_and_without_src_prefix(self):
         self.assertIn("assets.asm", self.makefile)
@@ -23,6 +24,11 @@ class BuildRegressionTests(unittest.TestCase):
 
     def test_console_vblank_has_explicit_declaration(self):
         self.assertIn("extern void consoleVblank(void);", self.main_source)
+
+    def test_gitignore_excludes_generated_asset_assembler_outputs(self):
+        self.assertIn("src/assets.asm", self.gitignore)
+        self.assertIn("src/assets.asp", self.gitignore)
+        self.assertIn("src/assets.ps", self.gitignore)
 
 
 if __name__ == "__main__":
