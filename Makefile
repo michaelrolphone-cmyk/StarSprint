@@ -1,6 +1,6 @@
 ifeq ($(filter test bundle-prebuilt,$(MAKECMDGOALS)),)
 ifeq ($(strip $(PVSNESLIB_HOME)),)
-$(error "Please create an environment variable PVSNESLIB_HOME by following this guide: https://github.com/alekmaul/pvsneslib/wiki/Installation")
+$(error "Please set PVSNESLIB_HOME to a pvsneslib 4.5.0 checkout: https://github.com/alekmaul/pvsneslib/wiki/Installation")
 endif
 
 include ${PVSNESLIB_HOME}/devkitsnes/snes_rules
@@ -30,6 +30,7 @@ test:
 	./tests/test_console_shim.sh
 	./tests/test_sprite_vram_alias_regression.sh
 	./tests/test_sprite_upload_path_regression.sh
+	./tests/test_pvsneslib_450_api_regression.sh
 
 bundle: all bundle-prebuilt
 
