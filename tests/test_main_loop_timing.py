@@ -8,8 +8,10 @@ class MainLoopTimingTests(unittest.TestCase):
     def setUpClass(cls):
         cls.source = Path("src/main.c").read_text()
 
-    def test_main_loop_scans_pads_every_frame(self):
-        self.assertIn("scanPads();", self.source)
+    def test_main_loop_reads_controllers_directly_without_scanpads(self):
+        self.assertIn("pad0 = padsCurrent(0);", self.source)
+        self.assertIn("pad1 = padsCurrent(1);", self.source)
+        self.assertNotIn("scanPads();", self.source)
 
     def test_nmi_callback_flushes_console_via_dma_path(self):
         callback_match = re.search(
@@ -28,14 +30,14 @@ class MainLoopTimingTests(unittest.TestCase):
 
         body = match.group("body")
         wait_index = body.find("WaitForVBlank();")
-        scan_index = body.find("scanPads();")
+        pad1_index = body.find("pad1 = padsCurrent(1);")
         pads_index = body.find("pad0 = padsCurrent(0);")
 
         self.assertNotEqual(wait_index, -1, "WaitForVBlank() missing from main loop")
-        self.assertNotEqual(scan_index, -1, "scanPads() missing from main loop")
+        self.assertNotEqual(pad1_index, -1, "padsCurrent(1) missing from main loop")
         self.assertNotEqual(pads_index, -1, "padsCurrent(0) missing from main loop")
-        self.assertLess(wait_index, scan_index)
-        self.assertLess(scan_index, pads_index)
+        self.assertLess(wait_index, pads_index)
+        self.assertLess(wait_index, pad1_index)
 
     def test_main_loop_waits_once_per_frame(self):
         match = re.search(r"while \(1\) \{(?P<body>.*?)\n    \}", self.source, re.S)
