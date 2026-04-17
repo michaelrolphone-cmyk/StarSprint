@@ -18,6 +18,9 @@ class TextRenderingConfigTests(unittest.TestCase):
     def test_console_palette_upload_targets_palette_zero(self):
         self.assertIn("consoleSetTextPal(0, (u8 *)uiTextPal, sizeof(uiTextPal));", self.source)
 
+    def test_text_background_layer_is_explicitly_enabled(self):
+        self.assertIn("bgSetEnable(0);", self.source)
+
 
 if __name__ == "__main__":
     unittest.main()

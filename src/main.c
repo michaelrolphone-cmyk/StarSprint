@@ -1947,6 +1947,7 @@ static void init_video(void) {
     bgSetGfxPtr(1, BG_WORLD_TILE_VRAM_ADDR);
     bgSetMapPtr(1, BG_WORLD_MAP_VRAM_ADDR, SC_32x32);
     setMode(BG_MODE1, 0);
+    bgSetEnable(0);
     bgSetDisable(1);
     bgSetDisable(2);
 
@@ -1980,6 +1981,7 @@ int main(void) {
         if (gameState != lastState) {
             clear_text_screen();
             set_backdrop_for_state(gameState);
+            bgSetEnable(0);
             if (gameState == STATE_PLAY) bgSetEnable(1);
             else bgSetDisable(1);
             playHudDirty = 1;
