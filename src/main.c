@@ -233,7 +233,7 @@ static u8 is_question(u8 tile);
 #define BG_WORLD_MAP_VRAM_ADDR 0x2000
 #define BG_WORLD_MAP_W 32
 #define BG_WORLD_MAP_H 32
-#define WORLD_BG_TILE_ATTR(tileIndex) ((u16)(BG_TIL_NUM(tileIndex) | BG_TIL_PAL(0)))
+#define WORLD_BG_TILE_ATTR(tileIndex) ((u16)TILE_ATTR_FULL(0, 0, 0, 0, (tileIndex)))
 #define WORLD_BG_EMPTY_TILE_BASE ((u16)((SPRITE_FRAME_COUNT - 1) * SPRITE_16X16_TILE_COUNT))
 
 static u16 worldBgMap[BG_WORLD_MAP_W * BG_WORLD_MAP_H];
@@ -1940,7 +1940,7 @@ static void set_backdrop_for_state(u8 state) {
 }
 
 static void vblank_dma_transfer(void) {
-    consoleUpdate();
+    consoleVblank();
     oamUpdate();
 }
 
