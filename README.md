@@ -100,6 +100,7 @@ The test suite includes `tests/test_pvsneslib_450_api_regression.sh`, which veri
 
 ## Latest tuning notes
 
+- launch now explicitly sets display brightness to full before screen-on to prevent black-screen boot on emulators/hardware that reset brightness to zero
 - title, world-map, and clear-state UI now use themed palettes to better match the cover-art color treatment
 - title and world-map scenes now stage sprites in a cover-inspired layout (hero centerpiece, star arc, rocket trail, and decorative pickups)
 - sprite palette was retuned for stronger saturated contrast to better reflect the uploaded art direction
@@ -109,3 +110,12 @@ The test suite includes `tests/test_pvsneslib_450_api_regression.sh`, which veri
 - co-op now merges controller input for shared movement while turn-based mode routes controls to the active player
 - turn-based mode persists each player's score/form/boost state and swaps players on wipe or level clear
 - gameplay events now trigger sound-effect IDs through a dedicated event mapping layer
+
+## Launch troubleshooting
+
+If a build still appears black at boot after this brightness fix:
+
+1. Verify your ROM was rebuilt (`make clean && make`) and you are launching the newly produced `starsprint.sfc`.
+2. Run `make test` and confirm `test_boot_brightness_regression: ok`.
+3. Capture emulator name/version and whether audio/game logic appears to run in the background.
+4. Open an issue with that emulator/version detail so the remaining render failure can be reproduced and fixed at the root cause.

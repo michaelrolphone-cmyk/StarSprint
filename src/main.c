@@ -1660,6 +1660,8 @@ static void init_video(void) {
 
     bgSetScroll(0, 0, 0);
     set_backdrop_for_state(STATE_TITLE);
+    /* Ensure the display exits reset at visible brightness instead of black. */
+    setBrightness(0x0F);
     setScreenOn();
 }
 

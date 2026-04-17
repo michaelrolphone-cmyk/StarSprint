@@ -30,6 +30,7 @@ test:
 	./tests/test_console_shim.sh
 	./tests/test_sprite_vram_alias_regression.sh
 	./tests/test_sprite_upload_path_regression.sh
+	./tests/test_boot_brightness_regression.sh
 	./tests/test_pvsneslib_450_api_regression.sh
 
 bundle: all bundle-prebuilt
