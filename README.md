@@ -6,6 +6,7 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 
 - 3 worlds
 - 4 levels per world
+- 2-player shared-screen co-op in every level
 - title screen plus interactive world map with level selection and progression
 - hidden grow and lightning powerups
 - smiley gold stars for score and boost banking
@@ -26,11 +27,15 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 - A or Start: enter selected level
 
 ### In level
+- Player 1 uses controller 1, player 2 uses controller 2
 - Left / Right: move
 - B: jump / release from a rope swing
 - Hold A: run faster
 - Hold A with banked boost: consume boost and run at super speed
 - Press A while lightning power is active: throw a lightning bolt
+- Press Y near your teammate: pick them up
+- Press Y again while holding: throw teammate with jump-style arc dynamics
+- If held, press B to jump free and escape
 - Down while falling: smash through brick blocks underfoot
 
 ## Build

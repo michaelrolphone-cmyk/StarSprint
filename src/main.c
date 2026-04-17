@@ -19,6 +19,7 @@ extern char tilfont, palfont;
 #define MAX_POWERUPS 8
 #define MAX_BOLTS 6
 #define MAX_ROPES 4
+#define MAX_PLAYERS 2
 
 #define PLAYER_W 10
 #define PLAYER_SMALL_H 14
@@ -32,6 +33,10 @@ extern char tilfont, palfont;
 
 #define BOLT_W 10
 #define BOLT_H 10
+
+#define PLAYER_PICKUP_RANGE_X 18
+#define PLAYER_PICKUP_RANGE_Y 16
+#define PLAYER_HELD_OFFSET_Y 12
 
 #define SPEED_WALK 4
 #define SPEED_RUN 6
@@ -91,6 +96,8 @@ typedef struct {
     u8 cooldown;
     u8 onRope;
     u8 ropeIndex;
+    u8 holding;
+    u8 heldBy;
 } Player;
 
 typedef struct {
@@ -142,7 +149,9 @@ typedef struct {
 } Rope;
 
 static u8 levelMap[LEVEL_H][LEVEL_W];
-static Player player;
+static Player players[MAX_PLAYERS];
+#define player players[0]
+#define player2 players[1]
 static Enemy enemies[MAX_ENEMIES];
 static StarItem stars[MAX_STARS];
 static Powerup powerups[MAX_POWERUPS];
@@ -155,7 +164,9 @@ static u16 superReserveFrames = 0;
 static u8 superActive = 0;
 static u16 cameraX = 0;
 static u16 pad0 = 0;
+static u16 pad1 = 0;
 static u16 padPrev = 0;
+static u16 padPrev1 = 0;
 static u8 spriteCount = 0;
 
 static u8 currentLevel = 0;
@@ -497,6 +508,22 @@ static void reset_player_position(void) {
     player.cooldown = 0;
     player.onRope = 0;
     player.ropeIndex = 255;
+    player.holding = 255;
+    player.heldBy = 255;
+
+    player2.x = 40;
+    player2.y = 9 * TILE_SIZE;
+    player2.vx = 0;
+    player2.vy = 0;
+    player2.onGround = 0;
+    player2.facingLeft = 0;
+    player2.smash = 0;
+    player2.invuln = 0;
+    player2.cooldown = 0;
+    player2.onRope = 0;
+    player2.ropeIndex = 255;
+    player2.holding = 255;
+    player2.heldBy = 255;
     cameraX = 0;
 }
 
@@ -505,13 +532,15 @@ static void begin_level(u8 levelIndex) {
     superActive = 0;
     player.big = 0;
     player.lightning = 0;
+    player2.big = 0;
+    player2.lightning = 0;
     build_level(currentLevel);
     reset_player_position();
     gameState = STATE_PLAY;
 }
 
-static s16 player_height(void) {
-    return player.big ? PLAYER_BIG_H : PLAYER_SMALL_H;
+static s16 player_height(const Player *p) {
+    return p->big ? PLAYER_BIG_H : PLAYER_SMALL_H;
 }
 
 static u8 is_level_completed(u8 levelIndex) {
@@ -608,21 +637,48 @@ static void restart_current_level(void) {
     superActive = 0;
     player.big = 0;
     player.lightning = 0;
+    player2.big = 0;
+    player2.lightning = 0;
     build_level(currentLevel);
     reset_player_position();
 }
 
-static void player_take_hit(void) {
-    if (player.invuln) return;
+static void release_hold(u8 holderIndex, u8 thrown) {
+    Player *holder = &players[holderIndex];
+    if (holder->holding >= MAX_PLAYERS) return;
+    {
+        u8 heldIndex = holder->holding;
+        Player *held = &players[heldIndex];
+        held->heldBy = 255;
+        holder->holding = 255;
+        if (thrown) {
+            held->vx = holder->facingLeft ? -SPEED_RUN : SPEED_RUN;
+            held->vy = JUMP_VELOCITY;
+            held->onGround = 0;
+        }
+    }
+}
 
-    if (player.lightning) {
-        player.lightning = 0;
-        player.invuln = 60;
+static void player_take_hit(u8 playerIndex) {
+    Player *p = &players[playerIndex];
+    if (p->invuln) return;
+
+    if (p->heldBy < MAX_PLAYERS) {
+        players[p->heldBy].holding = 255;
+        p->heldBy = 255;
+    }
+    if (p->holding < MAX_PLAYERS) {
+        release_hold(playerIndex, 0);
+    }
+
+    if (p->lightning) {
+        p->lightning = 0;
+        p->invuln = 60;
         return;
     }
-    if (player.big) {
-        player.big = 0;
-        player.invuln = 60;
+    if (p->big) {
+        p->big = 0;
+        p->invuln = 60;
         return;
     }
 
@@ -661,190 +717,234 @@ static void update_ropes(void) {
     }
 }
 
-static void try_grab_rope(void) {
+static void try_grab_rope(Player *p) {
     u8 i;
-    s16 h = player_height();
-    if (player.onRope || player.onGround) return;
+    s16 h = player_height(p);
+    if (p->onRope || p->onGround) return;
     for (i = 0; i < MAX_ROPES; i++) {
         if (!ropes[i].active) continue;
-        if (overlap(player.x, player.y, PLAYER_W, h, ropes[i].x - 8, ropes[i].y - 8, 16, 16)) {
-            player.onRope = 1;
-            player.ropeIndex = i;
-            player.vx = 0;
-            player.vy = 0;
-            player.x = ropes[i].x - (PLAYER_W >> 1);
-            player.y = ropes[i].y - h + 4;
+        if (overlap(p->x, p->y, PLAYER_W, h, ropes[i].x - 8, ropes[i].y - 8, 16, 16)) {
+            p->onRope = 1;
+            p->ropeIndex = i;
+            p->vx = 0;
+            p->vy = 0;
+            p->x = ropes[i].x - (PLAYER_W >> 1);
+            p->y = ropes[i].y - h + 4;
             return;
         }
     }
 }
 
-static void fire_bolt(void) {
+static void fire_bolt(Player *p) {
     u8 i;
-    if (!player.lightning || player.cooldown) return;
+    if (!p->lightning || p->cooldown) return;
     for (i = 0; i < MAX_BOLTS; i++) {
         if (!bolts[i].active) {
             bolts[i].active = 1;
-            bolts[i].x = player.x + (player.facingLeft ? -4 : PLAYER_W + 2);
-            bolts[i].y = player.y + (player.big ? 10 : 4);
-            bolts[i].vx = player.facingLeft ? -6 : 6;
+            bolts[i].x = p->x + (p->facingLeft ? -4 : PLAYER_W + 2);
+            bolts[i].y = p->y + (p->big ? 10 : 4);
+            bolts[i].vx = p->facingLeft ? -6 : 6;
             bolts[i].vy = -2;
             bolts[i].bounces = 3;
-            player.cooldown = 16;
+            p->cooldown = 16;
             return;
         }
     }
 }
 
-static void update_player_input(void) {
-    u8 jumpPressed = ((pad0 & KEY_B) && !(padPrev & KEY_B));
-    u8 aHeld = (pad0 & KEY_A) ? 1 : 0;
-    u8 aPressed = ((pad0 & KEY_A) && !(padPrev & KEY_A));
+static void update_player_input(u8 playerIndex, u16 padCur, u16 padOld) {
+    Player *p = &players[playerIndex];
+    Player *other = &players[playerIndex ^ 1];
+    u8 jumpPressed = ((padCur & KEY_B) && !(padOld & KEY_B));
+    u8 yPressed = ((padCur & KEY_Y) && !(padOld & KEY_Y));
+    u8 aHeld = (padCur & KEY_A) ? 1 : 0;
+    u8 aPressed = ((padCur & KEY_A) && !(padOld & KEY_A));
     s16 maxSpeed;
 
-    superActive = (aHeld && superReserveFrames > 0) ? 1 : 0;
+    if (playerIndex == 0) {
+        superActive = (aHeld && superReserveFrames > 0) ? 1 : 0;
+    }
     maxSpeed = superActive ? SPEED_SUPER : (aHeld ? SPEED_RUN : SPEED_WALK);
 
-    if (player.onRope) {
-        Rope *rope = &ropes[player.ropeIndex];
-        player.facingLeft = (rope->x < rope->prevX) ? 1 : 0;
-        player.smash = 0;
+    if (p->heldBy < MAX_PLAYERS) {
         if (jumpPressed) {
-            s16 dx = rope->x - rope->prevX;
-            s16 dy = rope->y - rope->prevY;
-            player.onRope = 0;
-            player.ropeIndex = 255;
-            player.vx = dx * 2;
-            if (player.vx == 0) player.vx = rope->dir * 4;
-            player.vy = (dy * 2) - 3;
-            if (player.vy < -10) player.vy = -10;
-            if (player.vy > 2) player.vy = 2;
+            u8 holder = p->heldBy;
+            release_hold(holder, 0);
+            p->vx = players[holder].facingLeft ? SPEED_WALK : -SPEED_WALK;
+            p->vy = JUMP_VELOCITY;
+            p->onGround = 0;
+        } else {
+            p->vx = 0;
+            p->vy = 0;
         }
-        if (aPressed && player.lightning) fire_bolt();
         return;
     }
 
-    if (pad0 & KEY_LEFT) {
-        player.vx--;
-        if (player.vx < -maxSpeed) player.vx = -maxSpeed;
-        player.facingLeft = 1;
-    } else if (pad0 & KEY_RIGHT) {
-        player.vx++;
-        if (player.vx > maxSpeed) player.vx = maxSpeed;
-        player.facingLeft = 0;
+    if (p->holding < MAX_PLAYERS) {
+        if (yPressed) {
+            release_hold(playerIndex, 1);
+        } else {
+            Player *held = &players[p->holding];
+            held->x = p->x + (p->facingLeft ? -6 : 6);
+            held->y = p->y - PLAYER_HELD_OFFSET_Y;
+            held->vx = 0;
+            held->vy = 0;
+            held->onGround = 0;
+        }
+    } else if (yPressed) {
+        if (overlap(p->x - PLAYER_PICKUP_RANGE_X, p->y - PLAYER_PICKUP_RANGE_Y, PLAYER_W + (PLAYER_PICKUP_RANGE_X * 2), player_height(p) + (PLAYER_PICKUP_RANGE_Y * 2), other->x, other->y, PLAYER_W, player_height(other)) && other->heldBy == 255) {
+            p->holding = playerIndex ^ 1;
+            other->heldBy = playerIndex;
+            other->onRope = 0;
+            other->ropeIndex = 255;
+            other->vx = 0;
+            other->vy = 0;
+        }
+    }
+
+    if (p->onRope) {
+        Rope *rope = &ropes[p->ropeIndex];
+        p->facingLeft = (rope->x < rope->prevX) ? 1 : 0;
+        p->smash = 0;
+        if (jumpPressed) {
+            s16 dx = rope->x - rope->prevX;
+            s16 dy = rope->y - rope->prevY;
+            p->onRope = 0;
+            p->ropeIndex = 255;
+            p->vx = dx * 2;
+            if (p->vx == 0) p->vx = rope->dir * 4;
+            p->vy = (dy * 2) - 3;
+            if (p->vy < -10) p->vy = -10;
+            if (p->vy > 2) p->vy = 2;
+        }
+        if (aPressed && p->lightning) fire_bolt(p);
+        return;
+    }
+
+    if (padCur & KEY_LEFT) {
+        p->vx--;
+        if (p->vx < -maxSpeed) p->vx = -maxSpeed;
+        p->facingLeft = 1;
+    } else if (padCur & KEY_RIGHT) {
+        p->vx++;
+        if (p->vx > maxSpeed) p->vx = maxSpeed;
+        p->facingLeft = 0;
     } else {
-        if (player.vx > 0) player.vx--;
-        if (player.vx < 0) player.vx++;
+        if (p->vx > 0) p->vx--;
+        if (p->vx < 0) p->vx++;
     }
 
-    if (jumpPressed && player.onGround) {
-        player.vy = JUMP_VELOCITY;
-        player.onGround = 0;
+    if (jumpPressed && p->onGround) {
+        p->vy = JUMP_VELOCITY;
+        p->onGround = 0;
     }
 
-    player.smash = (!player.onGround && (pad0 & KEY_DOWN) && player.vy > 0);
+    p->smash = (!p->onGround && (padCur & KEY_DOWN) && p->vy > 0);
 
-    if (aPressed && player.lightning) {
-        fire_bolt();
+    if (aPressed && p->lightning) {
+        fire_bolt(p);
     }
 }
 
-static u8 try_player_tunnel_step(s16 step, s16 h) {
+static u8 try_player_tunnel_step(Player *p, s16 step, s16 h) {
     static const s8 offsets[] = { -2, -1, 1, 2, -3, 3 };
     u8 i;
     s16 hitTx = 0, hitTy = 0;
 
-    if (player.big) return 0;
+    if (p->big) return 0;
 
     for (i = 0; i < (u8)(sizeof(offsets) / sizeof(offsets[0])); i++) {
-        s16 ny = player.y + offsets[i];
+        s16 ny = p->y + offsets[i];
         if (ny < 0) continue;
         if (ny > (LEVEL_H * TILE_SIZE) - h) continue;
-        if (rect_collide_tile(player.x, ny, PLAYER_W, h, &hitTx, &hitTy)) continue;
-        if (rect_collide_tile(player.x + step, ny, PLAYER_W, h, &hitTx, &hitTy)) continue;
-        player.y = ny;
-        player.x += step;
+        if (rect_collide_tile(p->x, ny, PLAYER_W, h, &hitTx, &hitTy)) continue;
+        if (rect_collide_tile(p->x + step, ny, PLAYER_W, h, &hitTx, &hitTy)) continue;
+        p->y = ny;
+        p->x += step;
         return 1;
     }
 
     return 0;
 }
 
-static void move_player(void) {
+static void move_player(u8 playerIndex) {
+    Player *p = &players[playerIndex];
     s16 step;
     s16 hitTx = 0, hitTy = 0;
-    s16 h = player_height();
+    s16 h = player_height(p);
 
-    if (player.onRope) {
-        if (player.ropeIndex >= MAX_ROPES || !ropes[player.ropeIndex].active) {
-            player.onRope = 0;
-            player.ropeIndex = 255;
+    if (p->heldBy < MAX_PLAYERS) return;
+
+    if (p->onRope) {
+        if (p->ropeIndex >= MAX_ROPES || !ropes[p->ropeIndex].active) {
+            p->onRope = 0;
+            p->ropeIndex = 255;
         } else {
-            player.onGround = 0;
-            player.vx = 0;
-            player.vy = 0;
-            player.x = ropes[player.ropeIndex].x - (PLAYER_W >> 1);
-            player.y = ropes[player.ropeIndex].y - h + 4;
+            p->onGround = 0;
+            p->vx = 0;
+            p->vy = 0;
+            p->x = ropes[p->ropeIndex].x - (PLAYER_W >> 1);
+            p->y = ropes[p->ropeIndex].y - h + 4;
             return;
         }
     }
 
-    player.onGround = 0;
+    p->onGround = 0;
 
-    if (player.vy < MAX_FALL) player.vy += GRAVITY;
-    if (player.vy > MAX_FALL) player.vy = MAX_FALL;
+    if (p->vy < MAX_FALL) p->vy += GRAVITY;
+    if (p->vy > MAX_FALL) p->vy = MAX_FALL;
 
-    if (player.invuln) player.invuln--;
-    if (player.cooldown) player.cooldown--;
+    if (p->invuln) p->invuln--;
+    if (p->cooldown) p->cooldown--;
 
     {
-        s16 remainingX = player.vx;
+        s16 remainingX = p->vx;
         if (remainingX != 0) {
             step = (remainingX < 0) ? -1 : 1;
             while (remainingX != 0) {
-                if (!rect_collide_tile(player.x + step, player.y, PLAYER_W, h, &hitTx, &hitTy)) {
-                    player.x += step;
+                if (!rect_collide_tile(p->x + step, p->y, PLAYER_W, h, &hitTx, &hitTy)) {
+                    p->x += step;
                     remainingX -= step;
-                } else if (try_player_tunnel_step(step, h)) {
+                } else if (try_player_tunnel_step(p, step, h)) {
                     remainingX -= step;
                 } else {
-                    player.vx = 0;
+                    p->vx = 0;
                     break;
                 }
             }
         }
     }
 
-    if (player.y > (LEVEL_H * TILE_SIZE) + 40) {
-        player_take_hit();
+    if (p->y > (LEVEL_H * TILE_SIZE) + 40) {
+        player_take_hit(playerIndex);
         return;
     }
 
     {
-        s16 remainingY = player.vy;
+        s16 remainingY = p->vy;
         if (remainingY != 0) {
             step = (remainingY < 0) ? -1 : 1;
             while (remainingY != 0) {
-                if (!rect_collide_tile(player.x, player.y + step, PLAYER_W, h, &hitTx, &hitTy)) {
-                    player.y += step;
+                if (!rect_collide_tile(p->x, p->y + step, PLAYER_W, h, &hitTx, &hitTy)) {
+                    p->y += step;
                     remainingY -= step;
                 } else {
                     if (step < 0) {
                         hit_block_from_below(hitTx, hitTy);
-                        player.vy = 0;
+                        p->vy = 0;
                     } else {
                         u8 tile = tile_at(hitTx, hitTy);
-                        if (player.smash && is_breakable(tile)) {
+                        if (p->smash && is_breakable(tile)) {
                             break_tile(hitTx, hitTy);
-                            player.y += 1;
-                            if (player.vy < 6) player.vy = 6;
+                            p->y += 1;
+                            if (p->vy < 6) p->vy = 6;
                         } else {
                             if (tile == TILE_SPIKES) {
-                                player_take_hit();
+                                player_take_hit(playerIndex);
                                 return;
                             }
-                            player.onGround = 1;
-                            player.vy = 0;
+                            p->onGround = 1;
+                            p->vy = 0;
                         }
                     }
                     break;
@@ -853,12 +953,12 @@ static void move_player(void) {
         }
     }
 
-    try_grab_rope();
+    try_grab_rope(p);
 
-    if (player.x < 0) player.x = 0;
-    if (player.x > (LEVEL_W * TILE_SIZE) - PLAYER_W) player.x = (LEVEL_W * TILE_SIZE) - PLAYER_W;
+    if (p->x < 0) p->x = 0;
+    if (p->x > (LEVEL_W * TILE_SIZE) - PLAYER_W) p->x = (LEVEL_W * TILE_SIZE) - PLAYER_W;
 
-    if (player.y + h >= SCREEN_H && player.vy == 0) player.onGround = 1;
+    if (p->y + h >= SCREEN_H && p->vy == 0) p->onGround = 1;
 }
 
 static u8 enemy_floor_ahead(const Enemy *enemy) {
@@ -1036,38 +1136,52 @@ static void update_bolts(void) {
 
 static void handle_pickups_and_hits(void) {
     u8 i;
+    u8 pidx;
 
     for (i = 0; i < MAX_STARS; i++) {
-        if (stars[i].active && overlap(player.x, player.y, PLAYER_W, player_height(), stars[i].x + 2, stars[i].y + 2, 12, 12)) {
-            stars[i].active = 0;
-            score += POINT_STAR;
-            starsTowardMinute++;
-            activate_star_reward();
+        if (!stars[i].active) continue;
+        for (pidx = 0; pidx < MAX_PLAYERS; pidx++) {
+            Player *p = &players[pidx];
+            if (overlap(p->x, p->y, PLAYER_W, player_height(p), stars[i].x + 2, stars[i].y + 2, 12, 12)) {
+                stars[i].active = 0;
+                score += POINT_STAR;
+                starsTowardMinute++;
+                activate_star_reward();
+                break;
+            }
         }
     }
 
     for (i = 0; i < MAX_POWERUPS; i++) {
-        if (powerups[i].active && overlap(player.x, player.y, PLAYER_W, player_height(), powerups[i].x, powerups[i].y, POWER_W, POWER_H)) {
-            if (powerups[i].type == POWER_GROW) {
-                player.big = 1;
-            } else if (powerups[i].type == POWER_LIGHTNING) {
-                player.big = 1;
-                player.lightning = 1;
+        if (!powerups[i].active) continue;
+        for (pidx = 0; pidx < MAX_PLAYERS; pidx++) {
+            Player *p = &players[pidx];
+            if (overlap(p->x, p->y, PLAYER_W, player_height(p), powerups[i].x, powerups[i].y, POWER_W, POWER_H)) {
+                if (powerups[i].type == POWER_GROW) {
+                    p->big = 1;
+                } else if (powerups[i].type == POWER_LIGHTNING) {
+                    p->big = 1;
+                    p->lightning = 1;
+                }
+                powerups[i].active = 0;
+                score += 250;
+                break;
             }
-            powerups[i].active = 0;
-            score += 250;
         }
     }
 
     for (i = 0; i < MAX_ENEMIES; i++) {
         if (!enemies[i].active) continue;
-        if (overlap(player.x, player.y, PLAYER_W, player_height(), enemies[i].x, enemies[i].y, ENEMY_W, ENEMY_H)) {
-            if (player.vy > 0 && (player.y + player_height()) <= (enemies[i].y + 8)) {
-                enemies[i].active = 0;
-                score += POINT_ENEMY;
-                player.vy = -7;
-            } else {
-                player_take_hit();
+        for (pidx = 0; pidx < MAX_PLAYERS; pidx++) {
+            Player *p = &players[pidx];
+            if (overlap(p->x, p->y, PLAYER_W, player_height(p), enemies[i].x, enemies[i].y, ENEMY_W, ENEMY_H)) {
+                if (p->vy > 0 && (p->y + player_height(p)) <= (enemies[i].y + 8)) {
+                    enemies[i].active = 0;
+                    score += POINT_ENEMY;
+                    p->vy = -7;
+                } else {
+                    player_take_hit(pidx);
+                }
             }
         }
     }
@@ -1085,13 +1199,14 @@ static void handle_pickups_and_hits(void) {
         }
     }
 
-    if (player.x >= LEVEL_GOAL_X) {
+    if (player.x >= LEVEL_GOAL_X || player2.x >= LEVEL_GOAL_X) {
         gameState = STATE_LEVEL_CLEAR;
     }
 }
 
 static void update_camera(void) {
-    s16 target = player.x - 96;
+    s16 focusX = (player.x + player2.x) / 2;
+    s16 target = focusX - 96;
     s16 maxCamera = (LEVEL_W * TILE_SIZE) - SCREEN_W;
     if (target < 0) target = 0;
     if (target > maxCamera) target = maxCamera;
@@ -1210,14 +1325,14 @@ static void draw_ropes(void) {
     }
 }
 
-static void draw_player(void) {
-    s16 sx = player.x - cameraX - 2;
-    s16 sy = player.y;
-    if (player.big) {
-        sprite_emit(SPR_PLAYER_BIG_TOP, sx, sy, player.facingLeft, 0);
-        sprite_emit(SPR_PLAYER_BIG_BOTTOM, sx, sy + 16, player.facingLeft, 0);
+static void draw_player(const Player *p, u8 pal) {
+    s16 sx = p->x - cameraX - 2;
+    s16 sy = p->y;
+    if (p->big) {
+        sprite_emit(SPR_PLAYER_BIG_TOP, sx, sy, p->facingLeft, pal);
+        sprite_emit(SPR_PLAYER_BIG_BOTTOM, sx, sy + 16, p->facingLeft, pal);
     } else {
-        sprite_emit(SPR_PLAYER_SMALL, sx, sy, player.facingLeft, 0);
+        sprite_emit(SPR_PLAYER_SMALL, sx, sy, p->facingLeft, pal);
     }
 }
 
@@ -1235,8 +1350,10 @@ static void draw_play_hud(void) {
     consoleDrawText(1, 1, "SCORE %05u", score);
     consoleDrawText(1, 2, "STARS %02u/60", starsTowardMinute);
     consoleDrawText(1, 3, "BOOST %03us %s", reserveSeconds, superActive ? "ON " : "OFF");
-    consoleDrawText(1, 4, "FORM  %s", player.lightning ? "LIGHT" : (player.big ? "BIG  " : "SMALL"));
-    consoleDrawText(1, 26, "B JUMP  A RUN/BOOST/FIRE");
+    consoleDrawText(1, 4, "P1 %s  P2 %s",
+        player.lightning ? "LIT" : (player.big ? "BIG" : "SML"),
+        player2.lightning ? "LIT" : (player2.big ? "BIG" : "SML"));
+    consoleDrawText(1, 26, "B JUMP  A RUN/FIRE  Y PICKUP/THROW");
 }
 
 static void draw_title_scene(void) {
@@ -1467,12 +1584,16 @@ int main(void) {
     reset_player_position();
     player.big = 0;
     player.lightning = 0;
+    player2.big = 0;
+    player2.lightning = 0;
 
     while (1) {
         WaitForVBlank();
         scanPads();
         padPrev = pad0;
+        padPrev1 = pad1;
         pad0 = padsCurrent(0);
+        pad1 = padsCurrent(1);
 
         if (gameState != lastState) {
             clear_text_screen();
@@ -1493,8 +1614,10 @@ int main(void) {
             }
 
             update_ropes();
-            update_player_input();
-            move_player();
+            update_player_input(0, pad0, padPrev);
+            update_player_input(1, pad1, padPrev1);
+            move_player(0);
+            move_player(1);
             update_enemies();
             update_powerups();
             update_bolts();
@@ -1508,7 +1631,8 @@ int main(void) {
             draw_enemies();
             draw_bolts();
             draw_ropes();
-            draw_player();
+            draw_player(&player, 0);
+            draw_player(&player2, 0);
             sprite_end();
             draw_play_hud();
         } else if (gameState == STATE_WORLD_MAP) {
