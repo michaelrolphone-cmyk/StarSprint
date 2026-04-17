@@ -19,6 +19,8 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 - rope jump-off now gets a short re-grab lockout so B reliably launches you away
 - movement pacing retuned with faster walk, run, and boosted run speeds
 - rendering now uses mixed pipelines: static level blocks draw through a BG1 tilemap while dynamic entities (players/enemies/items/ropes) draw through `oamInitGfxSet` + `oamSet`/`oamSetEx` sprites
+- level stages now render a sunny multi-layer parallax backdrop (clouds, cartoon mountains, and trees) behind gameplay
+- sprite rendering now uses PVSnesLib's `oamInitGfxSet` + `oamSet`/`oamSetEx` pipeline so each 16x16 frame maps cleanly and avoids dynamic upload flicker
 
 ## Controls
 

@@ -1544,6 +1544,45 @@ static void draw_world_background(void) {
     bgSetScroll(1, 0, 0);
 }
 
+static void draw_level_parallax_background(void) {
+    static const s16 cloudAnchors[4] = { 20, 108, 188, 252 };
+    static const s16 mountainAnchors[4] = { 0, 96, 192, 288 };
+    static const s16 treeAnchors[5] = { 12, 72, 136, 208, 280 };
+    u8 i;
+
+    /* Far layer: sunny cloud clusters drift slowly. */
+    for (i = 0; i < 4; i++) {
+        s16 sx = cloudAnchors[i] - ((s16)cameraX >> 2);
+        while (sx <= -64) sx += 320;
+        while (sx >= SCREEN_W + 16) sx -= 320;
+        sprite_emit(SPR_STAR_SMILE, sx, 18, 0, 0);
+        sprite_emit(SPR_STAR_SMILE, sx + 14, 14, 0, 0);
+        sprite_emit(SPR_STAR_SMILE, sx + 28, 18, 0, 0);
+    }
+
+    /* Mid layer: chunky cartoon mountains. */
+    for (i = 0; i < 4; i++) {
+        s16 sx = mountainAnchors[i] - ((s16)cameraX >> 1);
+        while (sx <= -80) sx += 320;
+        while (sx >= SCREEN_W + 32) sx -= 320;
+        sprite_emit(SPR_BRICK, sx + 16, 144, 0, 0);
+        sprite_emit(SPR_BRICK, sx, 160, 0, 0);
+        sprite_emit(SPR_BRICK, sx + 16, 160, 0, 0);
+        sprite_emit(SPR_BRICK, sx + 32, 160, 0, 0);
+    }
+
+    /* Near layer: rounded trees that move faster than mountains. */
+    for (i = 0; i < 5; i++) {
+        s16 sx = treeAnchors[i] - (((s16)cameraX * 3) >> 2);
+        while (sx <= -64) sx += 320;
+        while (sx >= SCREEN_W + 16) sx -= 320;
+        sprite_emit(SPR_USED_BLOCK, sx + 8, 152, 0, 0);
+        sprite_emit(SPR_GROW_POWER, sx, 136, 0, 0);
+        sprite_emit(SPR_GROW_POWER, sx + 16, 136, 0, 0);
+        sprite_emit(SPR_GROW_POWER, sx + 8, 120, 0, 0);
+    }
+}
+
 static void draw_stars(void) {
     u8 i;
     s16 sx;
@@ -1978,6 +2017,8 @@ int main(void) {
             draw_world_background();
 
             sprite_begin();
+            draw_level_parallax_background();
+            draw_world();
             draw_stars();
             draw_powerups();
             draw_enemies();
