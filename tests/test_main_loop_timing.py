@@ -11,6 +11,17 @@ class MainLoopTimingTests(unittest.TestCase):
     def test_main_loop_scans_pads_every_frame(self):
         self.assertIn("scanPads();", self.source)
 
+    def test_nmi_callback_flushes_console_via_dma_path(self):
+        callback_match = re.search(
+            r"static void vblank_dma_transfer\(void\) \{(?P<body>.*?)\n\}",
+            self.source,
+            re.S,
+        )
+        self.assertIsNotNone(callback_match, "vblank_dma_transfer() not found")
+        callback_body = callback_match.group("body")
+        self.assertIn("consoleVblank();", callback_body)
+        self.assertIn("nmiSet(vblank_dma_transfer);", self.source)
+
     def test_main_loop_waits_for_vblank_before_input(self):
         match = re.search(r"while \(1\) \{(?P<body>.*?)\n    \}", self.source, re.S)
         self.assertIsNotNone(match, "main loop while(1) body not found")

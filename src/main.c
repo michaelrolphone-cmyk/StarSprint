@@ -1435,6 +1435,10 @@ static void set_backdrop_for_state(u8 state) {
     }
 }
 
+static void vblank_dma_transfer(void) {
+    consoleVblank();
+}
+
 static void init_video(void) {
     consoleSetTextMapPtr(0x6800);
     consoleSetTextGfxPtr(0x3000);
@@ -1452,6 +1456,7 @@ static void init_video(void) {
 
     bgSetScroll(0, 0, 0);
     set_backdrop_for_state(STATE_TITLE);
+    nmiSet(vblank_dma_transfer);
     setScreenOn();
 }
 
@@ -1521,7 +1526,6 @@ int main(void) {
             sprite_end();
             draw_all_clear_screen();
         }
-
     }
 
     return 0;
