@@ -96,6 +96,9 @@ typedef struct {
     u8 cooldown;
     u8 onRope;
     u8 ropeIndex;
+    u8 wallHolding;
+    s8 wallSide;
+    u8 wantsWallGrab;
     u8 holding;
     u8 heldBy;
 } Player;
@@ -517,6 +520,9 @@ static void reset_player_position(void) {
     player.cooldown = 0;
     player.onRope = 0;
     player.ropeIndex = 255;
+    player.wallHolding = 0;
+    player.wallSide = 0;
+    player.wantsWallGrab = 0;
     player.holding = 255;
     player.heldBy = 255;
 
@@ -531,6 +537,9 @@ static void reset_player_position(void) {
     player2.cooldown = 0;
     player2.onRope = 0;
     player2.ropeIndex = 255;
+    player2.wallHolding = 0;
+    player2.wallSide = 0;
+    player2.wantsWallGrab = 0;
     player2.holding = 255;
     player2.heldBy = 255;
     cameraX = 0;
@@ -679,6 +688,9 @@ static void player_take_hit(u8 playerIndex) {
     if (p->holding < MAX_PLAYERS) {
         release_hold(playerIndex, 0);
     }
+    p->wallHolding = 0;
+    p->wallSide = 0;
+    p->wantsWallGrab = 0;
 
     if (p->lightning) {
         p->lightning = 0;
@@ -766,6 +778,7 @@ static void update_player_input(u8 playerIndex, u16 padCur, u16 padOld) {
     Player *other = &players[playerIndex ^ 1];
     u8 jumpPressed = ((padCur & KEY_B) && !(padOld & KEY_B));
     u8 yPressed = ((padCur & KEY_Y) && !(padOld & KEY_Y));
+    u8 yHeld = (padCur & KEY_Y) ? 1 : 0;
     u8 aHeld = (padCur & KEY_A) ? 1 : 0;
     u8 aPressed = ((padCur & KEY_A) && !(padOld & KEY_A));
     s16 maxSpeed;
@@ -825,6 +838,26 @@ static void update_player_input(u8 playerIndex, u16 padCur, u16 padOld) {
             p->vy = (dy * 2) - 3;
             if (p->vy < -10) p->vy = -10;
             if (p->vy > 2) p->vy = 2;
+        }
+        if (aPressed && p->lightning) fire_bolt(p);
+        return;
+    }
+
+    p->wantsWallGrab = yPressed;
+
+    if (p->wallHolding) {
+        p->vx = 0;
+        p->smash = 0;
+        p->facingLeft = (p->wallSide > 0) ? 1 : 0;
+        if (!yHeld || p->onGround) {
+            p->wallHolding = 0;
+            p->wallSide = 0;
+        } else if (jumpPressed) {
+            p->wallHolding = 0;
+            p->vy = JUMP_VELOCITY;
+            p->onGround = 0;
+            p->vx = (p->wallSide > 0) ? -SPEED_RUN : SPEED_RUN;
+            p->wallSide = 0;
         }
         if (aPressed && p->lightning) fire_bolt(p);
         return;
@@ -898,10 +931,25 @@ static void move_player(u8 playerIndex) {
         }
     }
 
+    if (p->wallHolding) {
+        s16 contactTx = 0, contactTy = 0;
+        s16 wallProbe = (p->wallSide > 0) ? 1 : -1;
+        if (p->wallSide == 0 || p->onGround || !rect_collide_tile(p->x + wallProbe, p->y, PLAYER_W, h, &contactTx, &contactTy)) {
+            p->wallHolding = 0;
+            p->wallSide = 0;
+        }
+    }
+
     p->onGround = 0;
 
-    if (p->vy < MAX_FALL) p->vy += GRAVITY;
-    if (p->vy > MAX_FALL) p->vy = MAX_FALL;
+    if (p->wallHolding) {
+        if (p->vy < 0) p->vy = 0;
+        if (p->vy < (MAX_FALL / 2)) p->vy += GRAVITY;
+        if (p->vy > (MAX_FALL / 2)) p->vy = (MAX_FALL / 2);
+    } else {
+        if (p->vy < MAX_FALL) p->vy += GRAVITY;
+        if (p->vy > MAX_FALL) p->vy = MAX_FALL;
+    }
 
     if (p->invuln) p->invuln--;
     if (p->cooldown) p->cooldown--;
@@ -917,6 +965,11 @@ static void move_player(u8 playerIndex) {
                 } else if (try_player_tunnel_step(p, step, h)) {
                     remainingX -= step;
                 } else {
+                    if (p->wantsWallGrab && !p->onGround && !p->wallHolding) {
+                        p->wallHolding = 1;
+                        p->wallSide = step;
+                        p->vy = 0;
+                    }
                     p->vx = 0;
                     break;
                 }
@@ -1399,7 +1452,7 @@ static void draw_play_hud(void) {
     consoleDrawText(1, 4, "P1 %s  P2 %s",
         player.lightning ? "LIT" : (player.big ? "BIG" : "SML"),
         player2.lightning ? "LIT" : (player2.big ? "BIG" : "SML"));
-    consoleDrawText(1, 26, "B JUMP  A RUN/FIRE  Y PICKUP/THROW");
+    consoleDrawText(1, 26, "B JUMP  A RUN/FIRE  Y PICKUP/WALL");
 }
 
 static void draw_title_scene(void) {
@@ -1431,12 +1484,14 @@ static void draw_title_screen(void) {
     consoleDrawText(6, 4, "STARSPRINT");
     consoleDrawText(3, 7, "A SIDE-SCROLLING PLATFORMER");
     consoleDrawText(4, 10, "B JUMPS / RELEASES ROPES");
-    consoleDrawText(3, 12, "A RUNS, USES BOOST, AND FIRES");
-    consoleDrawText(4, 14, "DOWN SMASHES BRICKS UNDERFOOT");
-    consoleDrawText(5, 16, "COLLECT 60 STARS FOR");
-    consoleDrawText(7, 17, "1 MINUTE OF BOOST");
-    consoleDrawText(5, 21, "PRESS START FOR MAP");
-    consoleDrawText(3, 24, "12 LEVELS ACROSS 3 WORLDS");
+    consoleDrawText(4, 12, "Y GRABS TEAMMATES OR WALLS");
+    consoleDrawText(3, 14, "HOLD Y TO SLIDE WALLS SLOWLY");
+    consoleDrawText(4, 16, "B WALL-JUMPS ONLY AWAY");
+    consoleDrawText(4, 18, "A RUNS, USES BOOST, AND FIRES");
+    consoleDrawText(4, 20, "DOWN SMASHES BRICKS UNDERFOOT");
+    consoleDrawText(5, 22, "COLLECT 60 STARS FOR");
+    consoleDrawText(7, 23, "1 MINUTE OF BOOST");
+    consoleDrawText(5, 25, "PRESS START FOR MAP");
 }
 
 static void update_title_input(void) {

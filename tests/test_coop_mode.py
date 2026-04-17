@@ -32,7 +32,7 @@ class CoopModeTests(unittest.TestCase):
         self.assertIn("p->vy = JUMP_VELOCITY;", body)
 
     def test_hud_mentions_pickup_throw_control(self):
-        self.assertIn('"B JUMP  A RUN/FIRE  Y PICKUP/THROW"', self.source)
+        self.assertIn('"B JUMP  A RUN/FIRE  Y PICKUP/WALL"', self.source)
 
 
 if __name__ == "__main__":
