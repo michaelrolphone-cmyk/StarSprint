@@ -16,6 +16,7 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 - bouncing lightning bolts once the lightning form is collected
 - faster movement, tuned jump height, more forgiving small-form tunnel movement, and enemies that patrol cliff edges instead of falling off
 - rope swing hazards, with airborne grab and timed release for extra traversal challenges
+- dynamic sprite engine rendering via PVSnesLib with a 16-color palette tuned to the imported retro platformer sprite sheet
 
 ## Controls
 
