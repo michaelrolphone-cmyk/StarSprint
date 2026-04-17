@@ -87,6 +87,30 @@ class MainLoopTimingTests(unittest.TestCase):
         self.assertIn("worldMapCachedReserveSeconds == reserveSeconds", body)
         self.assertIn("worldMapTextDirty = 0;", body)
 
+    def test_world_background_uses_tile_cache_and_fine_scroll(self):
+        fn = re.search(
+            r"static void draw_world_background\(void\) \{(?P<body>.*?)\n\}",
+            self.source,
+            re.S,
+        )
+        self.assertIsNotNone(fn, "draw_world_background() not found")
+        body = fn.group("body")
+        self.assertIn("s16 fineScrollX = cameraX & (TILE_SIZE - 1);", body)
+        self.assertIn("if (tx0 != worldBgCachedTx0) {", body)
+        self.assertIn("for (tx = 0; tx <= (SCREEN_W / TILE_SIZE); tx++) {", body)
+        self.assertIn("bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);", body)
+        self.assertIn("worldBgCachedTx0 = tx0;", body)
+        self.assertIn("bgSetScroll(1, fineScrollX, 0);", body)
+
+    def test_world_background_tile_cache_resets_when_building_level(self):
+        fn = re.search(
+            r"static void build_level\(u8 levelIndex\) \{(?P<body>.*?)\n\}",
+            self.source,
+            re.S,
+        )
+        self.assertIsNotNone(fn, "build_level() not found")
+        self.assertIn("worldBgCachedTx0 = -1;", fn.group("body"))
+
     def test_state_change_marks_hud_dirty_after_text_clear(self):
         state_change = re.search(
             r"if \(gameState != lastState\) \{(?P<body>.*?)\n        \}",
