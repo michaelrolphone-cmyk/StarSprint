@@ -1,6 +1,8 @@
 #ifndef STARSPRINT_ASSETS_H
 #define STARSPRINT_ASSETS_H
 
+#include <snes.h>
+
 enum SpriteFrame {
     SPR_PLAYER_SMALL = 0,
     SPR_PLAYER_BIG_TOP,
@@ -15,9 +17,6 @@ enum SpriteFrame {
     SPR_BOLT,
     SPR_GROUND,
     SPR_SPIKES,
-    SPR_ROPE_SEGMENT,
-    SPR_ROPE_KNOT,
-    SPR_TITLE_ROCKET
 };
 
 extern const unsigned char sprite_tiles[];
