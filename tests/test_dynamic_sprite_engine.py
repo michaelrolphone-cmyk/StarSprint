@@ -20,6 +20,7 @@ class DynamicSpriteEngineTests(unittest.TestCase):
         self.assertIsNotNone(fn, "sprite_emit() not found")
         body = fn.group("body")
         self.assertIn("oamId = spriteCount * 4;", body)
+        self.assertNotIn("oamId = spriteCount;", body)
         self.assertIn("oamSet(oamId, sx, sy, 3, hflip ? 1 : 0, 0, SPRITE_GFX_OFFSET(frame), pal & 0x07);", body)
         self.assertIn("oamSetEx(oamId, OBJ_SMALL, OBJ_SHOW);", body)
 
@@ -61,16 +62,17 @@ class DynamicSpriteEngineTests(unittest.TestCase):
         self.assertNotIn("oamVramQueueUpdate();", self.main_source)
         self.assertNotIn("oamInitDynamicSpriteEndFrame();", self.main_source)
 
-    def test_sprite_end_hides_remaining_oam_entries_by_oam_id(self):
+    def test_sprite_end_hides_remaining_oam_entries_by_oam_index(self):
         fn = re.search(r"static void sprite_end\(void\) \{(?P<body>.*?)\n\}", self.main_source, re.S)
         self.assertIsNotNone(fn, "sprite_end() not found")
         body = fn.group("body")
         self.assertIn("oamSetEx(spriteCount * 4, OBJ_SMALL, OBJ_HIDE);", body)
+        self.assertNotIn("oamSetEx(spriteCount, OBJ_SMALL, OBJ_HIDE);", body)
 
     def test_sprite_offset_macro_matches_16x16_tile_layout(self):
         self.assertIn("#define SPRITE_BYTES_PER_8X8 32", self.main_source)
         self.assertIn("#define SPRITE_16X16_TILE_COUNT 4", self.main_source)
-        self.assertIn("#define SPRITE_GFX_OFFSET(frame) ((u16)(frame) * SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8)", self.main_source)
+        self.assertIn("#define SPRITE_GFX_OFFSET(frame) ((u16)(frame) * SPRITE_16X16_TILE_COUNT)", self.main_source)
 
     def test_imported_palette_keeps_astronaut_and_space_tones(self):
         match = re.search(r"const unsigned short sprite_pal\[\] = \{(?P<body>.*?)\};", self.assets_source, re.S)
