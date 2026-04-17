@@ -43,6 +43,44 @@ class MainLoopTimingTests(unittest.TestCase):
         body = match.group("body")
         self.assertEqual(body.count("WaitForVBlank();"), 1)
 
+    def test_play_hud_uses_dirty_cache_to_avoid_redraw_every_frame(self):
+        draw_hud = re.search(
+            r"static void draw_play_hud\(void\) \{(?P<body>.*?)\n\}",
+            self.source,
+            re.S,
+        )
+        self.assertIsNotNone(draw_hud, "draw_play_hud() not found")
+        body = draw_hud.group("body")
+        self.assertIn("if (!playHudDirty &&", body)
+        self.assertIn("return;", body)
+        self.assertIn("playHudDirty = 0;", body)
+
+    def test_state_change_marks_hud_dirty_after_text_clear(self):
+        state_change = re.search(
+            r"if \(gameState != lastState\) \{(?P<body>.*?)\n        \}",
+            self.source,
+            re.S,
+        )
+        self.assertIsNotNone(state_change, "state-change branch not found")
+        body = state_change.group("body")
+        self.assertIn("clear_text_screen();", body)
+        self.assertIn("playHudDirty = 1;", body)
+
+    def test_entity_draw_loops_skip_offscreen_sprites_before_emit(self):
+        for fn_name, guard in [
+            ("draw_stars", "if (sx <= -16 || sx >= SCREEN_W) continue;"),
+            ("draw_enemies", "if (sx <= -ENEMY_W || sx >= SCREEN_W) continue;"),
+            ("draw_powerups", "if (sx <= -POWER_W || sx >= SCREEN_W) continue;"),
+            ("draw_bolts", "if (sx <= -BOLT_W || sx >= SCREEN_W) continue;"),
+        ]:
+            fn = re.search(
+                rf"static void {fn_name}\(void\) \{{(?P<body>.*?)\n\}}",
+                self.source,
+                re.S,
+            )
+            self.assertIsNotNone(fn, f"{fn_name}() not found")
+            self.assertIn(guard, fn.group("body"))
+
 
 if __name__ == "__main__":
     unittest.main()
