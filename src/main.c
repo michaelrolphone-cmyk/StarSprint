@@ -1443,7 +1443,9 @@ static void init_video(void) {
     consoleSetTextMapPtr(0x6800);
     consoleSetTextGfxPtr(0x3000);
     consoleSetTextOffset(0x0100);
-    consoleInitText(0, 16 * 2, &tilfont, &palfont);
+    // Palette number is 0-7 for 4bpp BG text. Using 32 prevents text colors
+    // from resolving correctly, so initialize the console on palette 0.
+    consoleInitText(0, 0, &tilfont, &palfont);
     consoleSetTextPal(0, (u8 *)uiTextPal, sizeof(uiTextPal));
 
     bgSetGfxPtr(0, 0x3000);
