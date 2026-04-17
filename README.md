@@ -35,6 +35,9 @@ A PVSnesLib homebrew side-scrolling platformer prototype for SNES.
 - Press A while lightning power is active: throw a lightning bolt
 - Press Y near your teammate: pick them up
 - Press Y again while holding: throw teammate with jump-style arc dynamics
+- Press Y as you hit a wall in midair: latch onto the wall
+- Hold Y while latched: slide down the wall at half fall speed
+- Press B during a wall latch: wall-jump away from the wall only
 - If held, press B to jump free and escape
 - Down while falling: smash through brick blocks underfoot
 
