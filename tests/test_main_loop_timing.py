@@ -46,6 +46,22 @@ class MainLoopTimingTests(unittest.TestCase):
         self.assertIsNotNone(match, "main loop while(1) body not found")
         body = match.group("body")
         self.assertEqual(body.count("WaitForVBlank();"), 1)
+        self.assertIn("#define PLAY_TICKS_PER_FRAME 2", self.source)
+
+    def test_play_loop_runs_two_simulation_ticks_per_video_frame(self):
+        play_state = re.search(
+            r"else if \(gameState == STATE_PLAY\) \{(?P<body>.*?)\n        \}",
+            self.source,
+            re.S,
+        )
+        self.assertIsNotNone(play_state, "STATE_PLAY branch not found")
+        body = play_state.group("body")
+        self.assertIn("for (tick = 0; tick < PLAY_TICKS_PER_FRAME; tick++) {", body)
+        self.assertIn("if (tick == 0) {", body)
+        self.assertIn("update_player_input(0, pad0, padPrev);", body)
+        self.assertIn("update_player_input(1, pad1, padPrev1);", body)
+        self.assertIn("update_player_input(0, pad0, pad0);", body)
+        self.assertIn("update_player_input(1, pad1, pad1);", body)
 
     def test_play_hud_uses_dirty_cache_to_avoid_redraw_every_frame(self):
         draw_hud = re.search(
