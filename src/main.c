@@ -231,7 +231,7 @@ static u8 is_question(u8 tile);
 #define SPRITE_FRAME_COUNT (SPRITE_TILES_LEN / (SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8))
 #define BG_WORLD_TILE_VRAM_ADDR 0x1000
 #define BG_WORLD_MAP_VRAM_ADDR 0x2000
-#define BG_WORLD_MAP_W 32
+#define BG_WORLD_MAP_W 64
 #define BG_WORLD_MAP_H 32
 #define WORLD_BG_TILE_ATTR(tileIndex) ((u16)TILE_ATTR_FULL(0, 0, 0, 0, (tileIndex)))
 #define WORLD_BG_EMPTY_TILE_BASE ((u16)((SPRITE_FRAME_COUNT - 1) * SPRITE_16X16_TILE_COUNT))
@@ -1548,7 +1548,7 @@ static void draw_world_background(void) {
             }
         }
 
-        bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);
+        bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_64x32, BG_WORLD_MAP_VRAM_ADDR);
         worldBgCachedTx0 = tx0;
     }
 
@@ -1955,7 +1955,7 @@ static void init_video(void) {
     bgSetGfxPtr(0, 0x3000);
     bgSetMapPtr(0, 0x6800, SC_32x32);
     bgSetGfxPtr(1, BG_WORLD_TILE_VRAM_ADDR);
-    bgSetMapPtr(1, BG_WORLD_MAP_VRAM_ADDR, SC_32x32);
+    bgSetMapPtr(1, BG_WORLD_MAP_VRAM_ADDR, SC_64x32);
     setMode(BG_MODE1, 0);
     bgSetEnable(0);
     bgSetDisable(1);
@@ -1963,7 +1963,7 @@ static void init_video(void) {
 
     bgInitTileSet(1, (u8 *)sprite_tiles, (u8 *)sprite_pal, 0, SPRITE_TILES_LEN, SPRITE_PAL_LEN, BG_16COLORS, BG_WORLD_TILE_VRAM_ADDR);
     clear_world_bg_map();
-    bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);
+    bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_64x32, BG_WORLD_MAP_VRAM_ADDR);
     worldBgCachedTx0 = -1;
 
     oamInitGfxSet((u8 *)sprite_tiles, SPRITE_TILES_LEN, (u8 *)sprite_pal, SPRITE_PAL_LEN, 0, SPRITE_GFX_VRAM_ADDR, OBJ_SIZE16_L32);

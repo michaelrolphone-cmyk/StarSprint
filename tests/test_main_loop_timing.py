@@ -100,7 +100,7 @@ class MainLoopTimingTests(unittest.TestCase):
         self.assertIn("s16 fineScrollX = cameraX & (TILE_SIZE - 1);", body)
         self.assertIn("if (tx0 != worldBgCachedTx0) {", body)
         self.assertIn("for (tx = 0; tx <= (SCREEN_W / TILE_SIZE); tx++) {", body)
-        self.assertIn("bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_32x32, BG_WORLD_MAP_VRAM_ADDR);", body)
+        self.assertIn("bgInitMapSet(1, (u8 *)worldBgMap, sizeof(worldBgMap), SC_64x32, BG_WORLD_MAP_VRAM_ADDR);", body)
         self.assertIn("worldBgCachedTx0 = tx0;", body)
         self.assertIn("bgSetScroll(1, fineScrollX, 0);", body)
 
