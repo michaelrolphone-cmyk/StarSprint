@@ -228,7 +228,8 @@ static u8 is_question(u8 tile);
 #define SPRITE_GFX_VRAM_ADDR 0x0000
 #define SPRITE_BYTES_PER_8X8 32
 #define SPRITE_16X16_TILE_COUNT 4
-#define SPRITE_GFX_OFFSET(frame) ((u16)(frame) * SPRITE_16X16_TILE_COUNT)
+// oamSet expects a VRAM byte offset for OBJ gfx, not a tile index.
+#define SPRITE_GFX_OFFSET(frame) ((u16)(frame) * SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8)
 #define SPRITE_FRAME_COUNT (SPRITE_TILES_LEN / (SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8))
 #define BG_WORLD_TILE_VRAM_ADDR 0x1000
 #define BG_WORLD_MAP_VRAM_ADDR 0x2000
