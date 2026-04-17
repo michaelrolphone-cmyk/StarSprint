@@ -216,9 +216,12 @@ static const u16 uiTextPal[16] = {
     0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF
 };
 
-static u16 frame_offset(u8 frameIndex) {
-    return ((frameIndex >> 3) * 32) + ((frameIndex & 7) * 2);
-}
+#define DYNAMIC_SPRITE_GFX0 0x0000
+#define DYNAMIC_SPRITE_GFX1 0x1000
+#define DYNAMIC_SPRITE_ATTR_BASE 0x21
+#define DYNAMIC_SPRITE_ATTR_HFLIP 0x40
+#define SPRITE_FRAME_BYTES 128
+
 
 static void clear_text_screen(void) {
     u8 y;
@@ -1370,12 +1373,20 @@ static void sprite_begin(void) {
 }
 
 static void sprite_emit(u8 frame, s16 sx, s16 sy, u8 hflip, u8 pal) {
-    u16 id;
+    u8 spriteAttr;
     if (spriteCount >= 128) return;
     if (sx <= -16 || sx >= SCREEN_W || sy <= -16 || sy >= SCREEN_H) return;
-    id = (u16)spriteCount * 4;
-    oamSet(id, (u16)sx, (u16)sy, 3, hflip, 0, frame_offset(frame), pal);
-    oamSetEx(id, OBJ_SMALL, OBJ_SHOW);
+
+    spriteAttr = DYNAMIC_SPRITE_ATTR_BASE | ((pal & 0x07) << 1);
+    if (hflip) spriteAttr |= DYNAMIC_SPRITE_ATTR_HFLIP;
+
+    oambuffer[spriteCount].oamx = sx;
+    oambuffer[spriteCount].oamy = sy;
+    oambuffer[spriteCount].oamframeid = 0;
+    oambuffer[spriteCount].oamattribute = spriteAttr;
+    oambuffer[spriteCount].oamrefresh = 1;
+    oambuffer[spriteCount].oamgraphics = ((u8 *)sprite_tiles) + ((u16)frame * SPRITE_FRAME_BYTES);
+    oamDynamic16Draw(spriteCount);
     spriteCount++;
 }
 
@@ -1769,6 +1780,8 @@ static void set_backdrop_for_state(u8 state) {
 
 static void vblank_dma_transfer(void) {
     consoleVblank();
+    oamVramQueueUpdate();
+    oamUpdate();
 }
 
 static void init_video(void) {
@@ -1786,7 +1799,8 @@ static void init_video(void) {
     bgSetDisable(1);
     bgSetDisable(2);
 
-    oamInitGfxSet((u8 *)sprite_tiles, SPRITE_TILES_LEN, (u8 *)sprite_pal, SPRITE_PAL_LEN, 0, 0x0000, OBJ_SIZE16_L32);
+    setPalette((u8 *)sprite_pal, 128 + (0 * 16), SPRITE_PAL_LEN);
+    oamInitDynamicSprite(DYNAMIC_SPRITE_GFX0, DYNAMIC_SPRITE_GFX1, 0, 0, OBJ_SIZE16_L32);
 
     bgSetScroll(0, 0, 0);
     set_backdrop_for_state(STATE_TITLE);
@@ -1873,6 +1887,8 @@ int main(void) {
             sprite_end();
             draw_all_clear_screen();
         }
+
+        oamInitDynamicSpriteEndFrame();
     }
 
     return 0;
