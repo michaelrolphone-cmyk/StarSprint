@@ -19,14 +19,22 @@ class DynamicSpriteEngineTests(unittest.TestCase):
         body = fn.group("body")
         self.assertIn("oambuffer[spriteCount].oamx = sx;", body)
         self.assertIn("oambuffer[spriteCount].oamy = sy;", body)
+        self.assertIn("oambuffer[spriteCount].oamframeid = frame;", body)
         self.assertIn("oambuffer[spriteCount].oamrefresh = 1;", body)
-        self.assertIn("oambuffer[spriteCount].oamgraphics = ((u8 *)sprite_tiles) + ((u16)frame * SPRITE_FRAME_BYTES);", body)
+        self.assertIn("oambuffer[spriteCount].oamgraphics = (u8 *)sprite_tiles;", body)
         self.assertIn("oamDynamic16Draw(spriteCount);", body)
 
     def test_dynamic_sprite_frame_lifecycle_runs_every_frame(self):
         self.assertIn("oamVramQueueUpdate();", self.main_source)
         self.assertIn("oamUpdate();", self.main_source)
         self.assertIn("oamInitDynamicSpriteEndFrame();", self.main_source)
+
+    def test_sprite_end_hides_remaining_oam_entries_by_index(self):
+        fn = re.search(r"static void sprite_end\(void\) \{(?P<body>.*?)\n\}", self.main_source, re.S)
+        self.assertIsNotNone(fn, "sprite_end() not found")
+        body = fn.group("body")
+        self.assertIn("oamSetVisible(spriteCount, OBJ_HIDE);", body)
+        self.assertNotIn("spriteCount * 4", body)
 
     def test_imported_palette_keeps_astronaut_and_space_tones(self):
         match = re.search(r"const unsigned short sprite_pal\[\] = \{(?P<body>.*?)\};", self.assets_source, re.S)
