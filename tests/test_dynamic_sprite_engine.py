@@ -19,6 +19,7 @@ class DynamicSpriteEngineTests(unittest.TestCase):
         fn = re.search(r"static void sprite_emit\(u8 frame, s16 sx, s16 sy, u8 hflip, u8 pal\) \{(?P<body>.*?)\n\}", self.main_source, re.S)
         self.assertIsNotNone(fn, "sprite_emit() not found")
         body = fn.group("body")
+        self.assertIn("u16 oamId;", body)
         self.assertIn("oamId = spriteCount * 4;", body)
         self.assertNotIn("oamId = spriteCount;", body)
         self.assertIn("oamSet(oamId, sx, sy, 3, hflip ? 1 : 0, 0, SPRITE_GFX_OFFSET(frame), pal & 0x07);", body)
@@ -56,9 +57,9 @@ class DynamicSpriteEngineTests(unittest.TestCase):
         body = fn.group("body")
         self.assertIn("worldBgMap[i] = WORLD_BG_TILE_ATTR(WORLD_BG_EMPTY_TILE_BASE);", body)
 
-    def test_frame_lifecycle_uses_nmi_console_flush_without_manual_oam_dma(self):
+    def test_frame_lifecycle_flushes_console_and_oam_every_vblank(self):
         self.assertIn("consoleVblank();", self.main_source)
-        self.assertNotIn("oamUpdate();", self.main_source)
+        self.assertIn("oamUpdate();", self.main_source)
         self.assertNotIn("oamVramQueueUpdate();", self.main_source)
         self.assertNotIn("oamInitDynamicSpriteEndFrame();", self.main_source)
 

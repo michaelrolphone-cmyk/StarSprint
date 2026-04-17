@@ -1516,7 +1516,7 @@ static void sprite_begin(void) {
 }
 
 static void sprite_emit(u8 frame, s16 sx, s16 sy, u8 hflip, u8 pal) {
-    u8 oamId;
+    u16 oamId;
     if (spriteCount >= 128) return;
     if (sx <= -16 || sx >= SCREEN_W || sy <= -16 || sy >= SCREEN_H) return;
 
@@ -1945,6 +1945,7 @@ static void set_backdrop_for_state(u8 state) {
 
 static void vblank_dma_transfer(void) {
     consoleVblank();
+    oamUpdate();
 }
 
 static void init_video(void) {
