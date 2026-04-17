@@ -39,8 +39,17 @@ class CoopModeTests(unittest.TestCase):
         self.assertIsNotNone(drag_fn, "apply_coop_screen_drag() not found")
         body = drag_fn.group("body")
         self.assertIn("if (players[i].x < leftEdge)", body)
+        self.assertIn("s16 dragDelta = leftEdge - players[i].x;", body)
         self.assertIn("players[i].x = leftEdge;", body)
         self.assertIn("if (players[i].vx < 0) players[i].vx = 0;", body)
+        self.assertIn("if (players[i].holding < MAX_PLAYERS)", body)
+        self.assertIn("held->x += dragDelta;", body)
+
+    def test_star_pickup_uses_padding_to_prevent_fast_movement_misses(self):
+        self.assertIn("#define STAR_COLLECT_PADDING_X 3", self.source)
+        self.assertIn("#define STAR_COLLECT_PADDING_Y 3", self.source)
+        self.assertIn("p->x - STAR_COLLECT_PADDING_X", self.source)
+        self.assertIn("p->y - STAR_COLLECT_PADDING_Y", self.source)
 
     def test_play_loop_applies_screen_drag_after_camera_update(self):
         play_state = re.search(
