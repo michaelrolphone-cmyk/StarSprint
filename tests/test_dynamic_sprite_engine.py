@@ -49,8 +49,9 @@ class DynamicSpriteEngineTests(unittest.TestCase):
         body = fn.group("body")
         self.assertIn("worldBgMap[i] = WORLD_BG_TILE_ATTR(WORLD_BG_EMPTY_TILE_BASE);", body)
 
-    def test_frame_lifecycle_updates_oam_without_dynamic_upload_queue(self):
-        self.assertIn("oamUpdate();", self.main_source)
+    def test_frame_lifecycle_uses_nmi_console_flush_without_manual_oam_dma(self):
+        self.assertIn("consoleVblank();", self.main_source)
+        self.assertNotIn("oamUpdate();", self.main_source)
         self.assertNotIn("oamVramQueueUpdate();", self.main_source)
         self.assertNotIn("oamInitDynamicSpriteEndFrame();", self.main_source)
 
