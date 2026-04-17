@@ -41,13 +41,14 @@ extern char tilfont, palfont;
 #define STAR_COLLECT_PADDING_X 3
 #define STAR_COLLECT_PADDING_Y 3
 
-#define SPEED_WALK 4
-#define SPEED_RUN 6
-#define SPEED_SUPER 12
+#define SPEED_WALK 5
+#define SPEED_RUN 8
+#define SPEED_SUPER 14
 #define JUMP_VELOCITY -12
 #define GRAVITY 1
 #define MAX_FALL 12
 #define ROPE_PHASE_COUNT 15
+#define ROPE_REGRAB_COOLDOWN 8
 
 #define POINT_STAR 100
 #define POINT_ENEMY 200
@@ -99,6 +100,7 @@ typedef struct {
     u8 cooldown;
     u8 onRope;
     u8 ropeIndex;
+    u8 ropeRegrabCooldown;
     u8 wallHolding;
     s8 wallSide;
     u8 wantsWallGrab;
@@ -538,6 +540,7 @@ static void reset_player_position(void) {
     player.cooldown = 0;
     player.onRope = 0;
     player.ropeIndex = 255;
+    player.ropeRegrabCooldown = 0;
     player.wallHolding = 0;
     player.wallSide = 0;
     player.wantsWallGrab = 0;
@@ -558,6 +561,7 @@ static void reset_player_position(void) {
     player2.cooldown = 0;
     player2.onRope = 0;
     player2.ropeIndex = 255;
+    player2.ropeRegrabCooldown = 0;
     player2.wallHolding = 0;
     player2.wallSide = 0;
     player2.wantsWallGrab = 0;
@@ -765,7 +769,7 @@ static void update_ropes(void) {
 static void try_grab_rope(Player *p) {
     u8 i;
     s16 h = player_height(p);
-    if (p->onRope || p->onGround) return;
+    if (p->onRope || p->onGround || p->ropeRegrabCooldown) return;
     for (i = 0; i < MAX_ROPES; i++) {
         if (!ropes[i].active) continue;
         if (overlap(p->x, p->y, PLAYER_W, h, ropes[i].x - 8, ropes[i].y - 8, 16, 16)) {
@@ -858,6 +862,7 @@ static void update_player_input(u8 playerIndex, u16 padCur, u16 padOld) {
             s16 dy = rope->y - rope->prevY;
             p->onRope = 0;
             p->ropeIndex = 255;
+            p->ropeRegrabCooldown = ROPE_REGRAB_COOLDOWN;
             p->vx = dx * 2;
             if (p->vx == 0) p->vx = rope->dir * 4;
             p->vy = (dy * 2) - 3;
@@ -971,6 +976,8 @@ static void move_player(u8 playerIndex) {
     s16 step;
     s16 hitTx = 0, hitTy = 0;
     s16 h = player_height(p);
+
+    if (p->ropeRegrabCooldown) p->ropeRegrabCooldown--;
 
     if (p->heldBy < MAX_PLAYERS) return;
 
