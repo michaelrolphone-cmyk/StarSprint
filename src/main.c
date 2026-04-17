@@ -221,10 +221,10 @@ static const u16 uiTextPal[16] = {
     0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF
 };
 
-#define DYNAMIC_SPRITE_GFX0 0x0000
-#define DYNAMIC_SPRITE_GFX1 0x1000
-#define DYNAMIC_SPRITE_ATTR_BASE 0x21
-#define DYNAMIC_SPRITE_ATTR_HFLIP 0x40
+#define SPRITE_GFX_VRAM_ADDR 0x0000
+#define SPRITE_BYTES_PER_8X8 32
+#define SPRITE_16X16_TILE_COUNT 4
+#define SPRITE_GFX_OFFSET(frame) ((u16)(frame) * SPRITE_16X16_TILE_COUNT * SPRITE_BYTES_PER_8X8)
 static void clear_text_screen(void) {
     u8 y;
     for (y = 0; y < TEXT_ROWS; y++) {
@@ -1462,26 +1462,19 @@ static void sprite_begin(void) {
 }
 
 static void sprite_emit(u8 frame, s16 sx, s16 sy, u8 hflip, u8 pal) {
-    u8 spriteAttr;
+    u8 oamId;
     if (spriteCount >= 128) return;
     if (sx <= -16 || sx >= SCREEN_W || sy <= -16 || sy >= SCREEN_H) return;
 
-    spriteAttr = DYNAMIC_SPRITE_ATTR_BASE | ((pal & 0x07) << 1);
-    if (hflip) spriteAttr |= DYNAMIC_SPRITE_ATTR_HFLIP;
-
-    oambuffer[spriteCount].oamx = sx;
-    oambuffer[spriteCount].oamy = sy;
-    oambuffer[spriteCount].oamframeid = frame;
-    oambuffer[spriteCount].oamattribute = spriteAttr;
-    oambuffer[spriteCount].oamrefresh = 1;
-    oambuffer[spriteCount].oamgraphics = (u8 *)sprite_tiles;
-    oamDynamic16Draw(spriteCount);
+    oamId = spriteCount * 4;
+    oamSet(oamId, sx, sy, 3, hflip ? 1 : 0, 0, SPRITE_GFX_OFFSET(frame), pal & 0x07);
+    oamSetEx(oamId, OBJ_SMALL, OBJ_SHOW);
     spriteCount++;
 }
 
 static void sprite_end(void) {
     while (spriteCount < 128) {
-        oamSetVisible(spriteCount, OBJ_HIDE);
+        oamSetEx(spriteCount * 4, OBJ_SMALL, OBJ_HIDE);
         spriteCount++;
     }
 }
@@ -1867,7 +1860,6 @@ static void set_backdrop_for_state(u8 state) {
 
 static void vblank_dma_transfer(void) {
     consoleVblank();
-    oamVramQueueUpdate();
     oamUpdate();
 }
 
@@ -1886,8 +1878,7 @@ static void init_video(void) {
     bgSetDisable(1);
     bgSetDisable(2);
 
-    setPalette((u8 *)sprite_pal, 128 + (0 * 16), SPRITE_PAL_LEN);
-    oamInitDynamicSprite(DYNAMIC_SPRITE_GFX0, DYNAMIC_SPRITE_GFX1, 0, 0, OBJ_SIZE16_L32);
+    oamInitGfxSet((u8 *)sprite_tiles, SPRITE_TILES_LEN, (u8 *)sprite_pal, SPRITE_PAL_LEN, 0, SPRITE_GFX_VRAM_ADDR, OBJ_SIZE16_L32);
 
     bgSetScroll(0, 0, 0);
     set_backdrop_for_state(STATE_TITLE);
@@ -1905,7 +1896,6 @@ int main(void) {
 
     while (1) {
         WaitForVBlank();
-        scanPads();
         padPrev = pad0;
         padPrev1 = pad1;
         pad0 = padsCurrent(0);
@@ -1976,7 +1966,6 @@ int main(void) {
             draw_all_clear_screen();
         }
 
-        oamInitDynamicSpriteEndFrame();
     }
 
     return 0;
