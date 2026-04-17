@@ -71,6 +71,47 @@ class CoopModeTests(unittest.TestCase):
         self.assertIn("s16 focusX = (player.x > player2.x) ? player.x : player2.x;", body)
         self.assertIn("s16 target = focusX - COOP_CAMERA_LEAD_OFFSET;", body)
 
+    def test_players_can_land_on_each_others_heads(self):
+        head_fn = re.search(r"static void resolve_player_head_stand\(Player \*rider, Player \*base\) \{(?P<body>.*?)\n\}", self.source, re.S)
+        self.assertIsNotNone(head_fn, "resolve_player_head_stand() not found")
+        body = head_fn.group("body")
+        self.assertIn("if (rider->vy < 0) return;", body)
+        self.assertIn("if ((overlapRight - overlapLeft) < 6) return;", body)
+        self.assertIn("rider->y = baseTop - riderH;", body)
+        self.assertIn("rider->vy = 0;", body)
+        self.assertIn("rider->onGround = 1;", body)
+        self.assertIn("if (rider->smash)", body)
+        self.assertIn("bounce_player_from_smash(base, rider);", body)
+
+    def test_smash_has_faster_fall_and_bounce_distance(self):
+        self.assertIn("#define SMASH_FALL_MAX 18", self.source)
+        self.assertIn("#define SMASH_BOUNCE_DISTANCE 24", self.source)
+        self.assertIn("#define SMASH_BOUNCE_UPWARD -9", self.source)
+        self.assertIn("s16 maxFall = p->smash ? SMASH_FALL_MAX : MAX_FALL;", self.source)
+        self.assertIn("if (p->smash && p->vy > 0 && (p->y & 1) == 0) p->vy++;", self.source)
+
+    def test_smash_landing_pushes_target_player_away(self):
+        smash_fn = re.search(r"static void bounce_player_from_smash\(Player \*launched, const Player \*source\) \{(?P<body>.*?)\n\}", self.source, re.S)
+        self.assertIsNotNone(smash_fn, "bounce_player_from_smash() not found")
+        body = smash_fn.group("body")
+        self.assertIn("targetX = launched->x + (direction * SMASH_BOUNCE_DISTANCE);", body)
+        self.assertIn("launched->vy = SMASH_BOUNCE_UPWARD;", body)
+        self.assertIn("launched->onGround = 0;", body)
+
+    def test_play_loop_resolves_player_stacking_after_player_movement(self):
+        play_state = re.search(
+            r"else if \(gameState == STATE_PLAY\) \{(?P<body>.*?)\n        \}",
+            self.source,
+            re.S,
+        )
+        self.assertIsNotNone(play_state, "STATE_PLAY branch not found")
+        body = play_state.group("body")
+        self.assertIn("move_player(0);", body)
+        self.assertIn("move_player(1);", body)
+        self.assertIn("resolve_player_stack_collision();", body)
+        self.assertLess(body.find("move_player(1);"), body.find("resolve_player_stack_collision();"))
+        self.assertLess(body.find("resolve_player_stack_collision();"), body.find("update_enemies();"))
+
 
 if __name__ == "__main__":
     unittest.main()
