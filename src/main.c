@@ -1,8 +1,5 @@
 #include <snes.h>
 #include "assets.h"
-#include "sprite_format.h"
-#include "game_logic.h"
-#include "video_layout.h"
 
 extern char tilfont, palfont;
 
@@ -43,14 +40,11 @@ extern char tilfont, palfont;
 #define GRAVITY 1
 #define MAX_FALL 12
 #define ROPE_PHASE_COUNT 15
-#define MAX_PLAY_SUBSTEPS 2
 
 #define POINT_STAR 100
 #define POINT_ENEMY 200
 #define POINT_BLOCK 50
-#define POINT_LIFE 500
 #define SUPER_FRAMES_PER_MINUTE 3600
-#define MAX_LIVES 9
 #define LEVEL_GOAL_X ((LEVEL_W * TILE_SIZE) - 40)
 
 #define BLANK_LINE "                                "
@@ -62,14 +56,12 @@ enum TileType {
     TILE_USED,
     TILE_POWER_GROW,
     TILE_POWER_LIGHT,
-    TILE_POWER_LIFE,
     TILE_SPIKES
 };
 
 enum PowerType {
     POWER_GROW = 1,
-    POWER_LIGHTNING = 2,
-    POWER_LIFE = 3
+    POWER_LIGHTNING = 2
 };
 
 enum EnemyType {
@@ -99,7 +91,6 @@ typedef struct {
     u8 cooldown;
     u8 onRope;
     u8 ropeIndex;
-    u8 ropeGrabLock;
 } Player;
 
 typedef struct {
@@ -161,15 +152,11 @@ static Rope ropes[MAX_ROPES];
 static u16 score = 0;
 static u8 starsTowardMinute = 0;
 static u16 superReserveFrames = 0;
-static u8 lives = PLAYER_START_LIVES;
 static u8 superActive = 0;
 static u16 cameraX = 0;
 static u16 pad0 = 0;
-static u16 pad1 = 0;
-static u16 padInput = 0;
-static u16 padPrevInput = 0;
+static u16 padPrev = 0;
 static u8 spriteCount = 0;
-static u8 spriteTilesVram[SPRITE_TILES_LEN];
 
 static u8 currentLevel = 0;
 static u8 selectedLevel = 0;
@@ -177,19 +164,6 @@ static u8 highestUnlocked = 0;
 static u16 completedBits = 0;
 static u8 gameState = STATE_TITLE;
 static u8 lastState = 255;
-static u8 playerMode = PLAYER_MODE_COOP;
-static u8 activeTurnPlayer = 0;
-
-typedef struct {
-    u16 score;
-    u8 starsTowardMinute;
-    u16 superReserveFrames;
-    u8 lives;
-    u8 big;
-    u8 lightning;
-} PlayerRunState;
-
-static PlayerRunState runState[2];
 
 static const char *worldNames[WORLD_COUNT] = {
     "MEADOW",
@@ -199,63 +173,13 @@ static const char *worldNames[WORLD_COUNT] = {
 
 static const s16 ropeSwingX[ROPE_PHASE_COUNT] = { -44, -38, -31, -24, -17, -11, -6, 0, 6, 11, 17, 24, 31, 38, 44 };
 static const s16 ropeSwingY[ROPE_PHASE_COUNT] = { 22, 16, 11, 7, 4, 2, 1, 0, 1, 2, 4, 7, 11, 16, 22 };
-static const u16 uiTextPalTitle[16] = {
-    0x0000, 0x7FFF, 0x739F, 0x631F, 0x031F, 0x015A, 0x01DF, 0x02BF,
-    0x03BF, 0x03DF, 0x1FFF, 0x4A7F, 0x7E00, 0x7F00, 0x5A00, 0x2D60
-};
-static const u16 uiTextPalMap[16] = {
-    0x0000, 0x7FFF, 0x6F7F, 0x5EDF, 0x45DF, 0x34DF, 0x2FFF, 0x1FFF,
-    0x17FF, 0x0FFF, 0x077F, 0x7F00, 0x6A40, 0x55A0, 0x3CC0, 0x1C00
-};
-static const u16 uiTextPalPlay[16] = {
+static const u16 uiTextPal[16] = {
     0x0000, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF,
     0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF
 };
-static const u16 uiTextPalClear[16] = {
-    0x0000, 0x7FFF, 0x7BFF, 0x5FFF, 0x47FF, 0x2BFF, 0x13FF, 0x03FF,
-    0x03DF, 0x2FFF, 0x4FFF, 0x6BFF, 0x7E00, 0x6D00, 0x5400, 0x2A00
-};
 
-static const u16 *ui_palette_for_theme(u8 theme) {
-    if (theme == UI_THEME_TITLE) return uiTextPalTitle;
-    if (theme == UI_THEME_MAP) return uiTextPalMap;
-    if (theme == UI_THEME_PLAY) return uiTextPalPlay;
-    return uiTextPalClear;
-}
-
-static void apply_ui_theme(u8 state) {
-    u8 theme = ui_theme_for_state(state);
-    const u16 *pal = ui_palette_for_theme(theme);
-    consoleSetTextPal(0, (u8 *)pal, 32);
-}
-
-static void play_sfx(u8 eventId) {
-    (void)sound_for_event(eventId);
-}
-
-static void save_active_run_state(void) {
-    runState[activeTurnPlayer].score = score;
-    runState[activeTurnPlayer].starsTowardMinute = starsTowardMinute;
-    runState[activeTurnPlayer].superReserveFrames = superReserveFrames;
-    runState[activeTurnPlayer].lives = lives;
-    runState[activeTurnPlayer].big = player.big;
-    runState[activeTurnPlayer].lightning = player.lightning;
-}
-
-static void load_active_run_state(void) {
-    score = runState[activeTurnPlayer].score;
-    starsTowardMinute = runState[activeTurnPlayer].starsTowardMinute;
-    superReserveFrames = runState[activeTurnPlayer].superReserveFrames;
-    lives = runState[activeTurnPlayer].lives;
-    player.big = runState[activeTurnPlayer].big;
-    player.lightning = runState[activeTurnPlayer].lightning;
-}
-
-static void swap_turn_player(void) {
-    save_active_run_state();
-    activeTurnPlayer = next_turn_player(playerMode, activeTurnPlayer, 1);
-    load_active_run_state();
-    play_sfx(SFX_TURN_SWAP);
+static u16 frame_offset(u8 frameIndex) {
+    return ((frameIndex >> 3) * 32) + ((frameIndex & 7) * 2);
 }
 
 static void clear_text_screen(void) {
@@ -439,18 +363,8 @@ static void add_brick_strip(s16 tx0, s16 tx1, s16 ty) {
     set_span(tx0, tx1, ty, TILE_BRICK);
 }
 
-static void add_used_strip(s16 tx0, s16 tx1, s16 ty) {
-    set_span(tx0, tx1, ty, TILE_USED);
-}
-
 static void add_hidden_power(s16 tx, s16 ty, u8 type) {
-    if (type == POWER_GROW) {
-        set_tile(tx, ty, TILE_POWER_GROW);
-    } else if (type == POWER_LIGHTNING) {
-        set_tile(tx, ty, TILE_POWER_LIGHT);
-    } else {
-        set_tile(tx, ty, TILE_POWER_LIFE);
-    }
+    set_tile(tx, ty, (type == POWER_GROW) ? TILE_POWER_GROW : TILE_POWER_LIGHT);
 }
 
 static void add_stairs(s16 tx, s16 steps, s16 dir) {
@@ -536,25 +450,6 @@ static void build_level(u8 levelIndex) {
         if ((i + stage) & 1) add_enemy(ENEMY_WALK, tx + 1, 10 - (i & 1), -1);
     }
 
-    for (i = 0; i < 4; i++) {
-        s16 arcCenter = 24 + i * 42 + (level_style_seed(levelIndex, i) % 10);
-        s16 arcY = 7 + (i & 1);
-        if (arcCenter >= LEVEL_W - 22) continue;
-        add_star_arch(arcCenter - 5, arcCenter + 5, arcY);
-        add_ground_platform(arcCenter - 1, arcCenter + 1, arcY + 2);
-    }
-
-    for (i = 0; i < 3; i++) {
-        s16 cloudBase = 34 + i * 46 + (level_style_seed(levelIndex, i + 9) % 12);
-        s16 cloudY = 6 + (i % 2);
-        if (cloudBase >= LEVEL_W - 28) continue;
-        add_used_strip(cloudBase, cloudBase + 4, cloudY);
-        add_star_line(cloudBase, cloudBase + 4, cloudY - 1);
-        if (i == 1) {
-            add_spike_strip(cloudBase + 1, cloudBase + 2);
-        }
-    }
-
     if (world == 0) {
         add_brick_strip(14, 18, 9);
         add_hidden_power(16, 9, POWER_GROW);
@@ -580,7 +475,6 @@ static void build_level(u8 levelIndex) {
     add_stairs(LEVEL_W - 18, 5, 1);
     add_stairs(LEVEL_W - 8, 4, -1);
     add_star_line(LEVEL_W - 18, LEVEL_W - 10, 6 - world);
-    add_used_strip(LEVEL_W - 32, LEVEL_W - 20, 8);
 
     if (levelIndex == 0) {
         set_span(43, 47, 8, TILE_EMPTY);
@@ -588,12 +482,6 @@ static void build_level(u8 levelIndex) {
         add_star_arch(38, 47, 6);
         add_ground_platform(38, 39, 10);
         add_ground_platform(44, 46, 10);
-    }
-
-    {
-        s16 lifeTx = 18 + (stage * 8) + (world * 19);
-        if (lifeTx > LEVEL_W - 24) lifeTx = LEVEL_W - 24;
-        add_hidden_power(lifeTx, 7, POWER_LIFE);
     }
 }
 
@@ -609,19 +497,14 @@ static void reset_player_position(void) {
     player.cooldown = 0;
     player.onRope = 0;
     player.ropeIndex = 255;
-    player.ropeGrabLock = 0;
     cameraX = 0;
 }
 
 static void begin_level(u8 levelIndex) {
     currentLevel = levelIndex;
     superActive = 0;
-    if (playerMode == PLAYER_MODE_COOP) {
-        player.big = 0;
-        player.lightning = 0;
-    } else {
-        load_active_run_state();
-    }
+    player.big = 0;
+    player.lightning = 0;
     build_level(currentLevel);
     reset_player_position();
     gameState = STATE_PLAY;
@@ -650,7 +533,7 @@ static u8 completed_count(void) {
 }
 
 static u8 is_solid(u8 tile) {
-    return (tile == TILE_GROUND || tile == TILE_BRICK || tile == TILE_USED || tile == TILE_POWER_GROW || tile == TILE_POWER_LIGHT || tile == TILE_POWER_LIFE || tile == TILE_SPIKES);
+    return (tile == TILE_GROUND || tile == TILE_BRICK || tile == TILE_USED || tile == TILE_POWER_GROW || tile == TILE_POWER_LIGHT || tile == TILE_SPIKES);
 }
 
 static u8 is_breakable(u8 tile) {
@@ -658,7 +541,7 @@ static u8 is_breakable(u8 tile) {
 }
 
 static u8 is_question(u8 tile) {
-    return (tile == TILE_POWER_GROW || tile == TILE_POWER_LIGHT || tile == TILE_POWER_LIFE);
+    return (tile == TILE_POWER_GROW || tile == TILE_POWER_LIGHT);
 }
 
 static u8 tile_at(s16 tx, s16 ty) {
@@ -690,7 +573,6 @@ static void break_tile(s16 tx, s16 ty) {
     if (tx >= 0 && tx < LEVEL_W && ty >= 0 && ty < LEVEL_H) {
         levelMap[(u8)ty][(u8)tx] = TILE_EMPTY;
         score += POINT_BLOCK;
-        play_sfx(SFX_HIT);
     }
 }
 
@@ -712,12 +594,6 @@ static void hit_block_from_below(s16 tx, s16 ty) {
         score += POINT_BLOCK;
         return;
     }
-    if (tile == TILE_POWER_LIFE) {
-        levelMap[(u8)ty][(u8)tx] = TILE_USED;
-        spawn_powerup(POWER_LIFE, tx, ty);
-        score += POINT_BLOCK;
-        return;
-    }
 }
 
 static u8 overlap(s16 ax, s16 ay, s16 aw, s16 ah, s16 bx, s16 by, s16 bw, s16 bh) {
@@ -730,12 +606,8 @@ static u8 overlap(s16 ax, s16 ay, s16 aw, s16 ah, s16 bx, s16 by, s16 bw, s16 bh
 
 static void restart_current_level(void) {
     superActive = 0;
-    if (playerMode == PLAYER_MODE_COOP) {
-        player.big = 0;
-        player.lightning = 0;
-    } else {
-        swap_turn_player();
-    }
+    player.big = 0;
+    player.lightning = 0;
     build_level(currentLevel);
     reset_player_position();
 }
@@ -746,36 +618,22 @@ static void player_take_hit(void) {
     if (player.lightning) {
         player.lightning = 0;
         player.invuln = 60;
-        play_sfx(SFX_HIT);
         return;
     }
     if (player.big) {
         player.big = 0;
         player.invuln = 60;
-        play_sfx(SFX_HIT);
         return;
     }
 
-    play_sfx(SFX_HIT);
-    if (lose_life_and_continue(&lives)) {
-        restart_current_level();
-    } else {
-        lives = PLAYER_START_LIVES;
-        score = 0;
-        starsTowardMinute = 0;
-        superReserveFrames = 0;
-        player.big = 0;
-        player.lightning = 0;
-        if (playerMode == PLAYER_MODE_TURN_BASED) {
-            save_active_run_state();
-            swap_turn_player();
-        }
-        gameState = STATE_WORLD_MAP;
-    }
+    restart_current_level();
 }
 
 static void activate_star_reward(void) {
-    award_star_and_super(&starsTowardMinute, &superReserveFrames, SUPER_FRAMES_PER_MINUTE);
+    while (starsTowardMinute >= 60) {
+        starsTowardMinute -= 60;
+        superReserveFrames += SUPER_FRAMES_PER_MINUTE;
+    }
 }
 
 static void update_ropes(void) {
@@ -806,7 +664,7 @@ static void update_ropes(void) {
 static void try_grab_rope(void) {
     u8 i;
     s16 h = player_height();
-    if (!should_attempt_rope_grab(player.onRope, player.onGround, player.ropeGrabLock)) return;
+    if (player.onRope || player.onGround) return;
     for (i = 0; i < MAX_ROPES; i++) {
         if (!ropes[i].active) continue;
         if (overlap(player.x, player.y, PLAYER_W, h, ropes[i].x - 8, ropes[i].y - 8, 16, 16)) {
@@ -833,20 +691,19 @@ static void fire_bolt(void) {
             bolts[i].vy = -2;
             bolts[i].bounces = 3;
             player.cooldown = 16;
-            play_sfx(SFX_FIRE);
             return;
         }
     }
 }
 
 static void update_player_input(void) {
-    u8 jumpPressed = ((padInput & KEY_B) && !(padPrevInput & KEY_B));
-    u8 yHeld = (padInput & KEY_Y) ? 1 : 0;
-    u8 yPressed = ((padInput & KEY_Y) && !(padPrevInput & KEY_Y));
+    u8 jumpPressed = ((pad0 & KEY_B) && !(padPrev & KEY_B));
+    u8 aHeld = (pad0 & KEY_A) ? 1 : 0;
+    u8 aPressed = ((pad0 & KEY_A) && !(padPrev & KEY_A));
     s16 maxSpeed;
 
-    superActive = (yHeld && superReserveFrames > 0) ? 1 : 0;
-    maxSpeed = superActive ? SPEED_SUPER : (yHeld ? SPEED_RUN : SPEED_WALK);
+    superActive = (aHeld && superReserveFrames > 0) ? 1 : 0;
+    maxSpeed = superActive ? SPEED_SUPER : (aHeld ? SPEED_RUN : SPEED_WALK);
 
     if (player.onRope) {
         Rope *rope = &ropes[player.ropeIndex];
@@ -857,23 +714,21 @@ static void update_player_input(void) {
             s16 dy = rope->y - rope->prevY;
             player.onRope = 0;
             player.ropeIndex = 255;
-            player.ropeGrabLock = 10;
             player.vx = dx * 2;
             if (player.vx == 0) player.vx = rope->dir * 4;
             player.vy = (dy * 2) - 3;
             if (player.vy < -10) player.vy = -10;
             if (player.vy > 2) player.vy = 2;
-            play_sfx(SFX_JUMP);
         }
-        if (yPressed && player.lightning) fire_bolt();
+        if (aPressed && player.lightning) fire_bolt();
         return;
     }
 
-    if (padInput & KEY_LEFT) {
+    if (pad0 & KEY_LEFT) {
         player.vx--;
         if (player.vx < -maxSpeed) player.vx = -maxSpeed;
         player.facingLeft = 1;
-    } else if (padInput & KEY_RIGHT) {
+    } else if (pad0 & KEY_RIGHT) {
         player.vx++;
         if (player.vx > maxSpeed) player.vx = maxSpeed;
         player.facingLeft = 0;
@@ -885,12 +740,11 @@ static void update_player_input(void) {
     if (jumpPressed && player.onGround) {
         player.vy = JUMP_VELOCITY;
         player.onGround = 0;
-        play_sfx(SFX_JUMP);
     }
 
-    player.smash = (!player.onGround && (padInput & KEY_DOWN) && player.vy > 0);
+    player.smash = (!player.onGround && (pad0 & KEY_DOWN) && player.vy > 0);
 
-    if (yPressed && player.lightning) {
+    if (aPressed && player.lightning) {
         fire_bolt();
     }
 }
@@ -942,7 +796,6 @@ static void move_player(void) {
 
     if (player.invuln) player.invuln--;
     if (player.cooldown) player.cooldown--;
-    if (player.ropeGrabLock) player.ropeGrabLock--;
 
     {
         s16 remainingX = player.vx;
@@ -1181,15 +1034,6 @@ static void update_bolts(void) {
     }
 }
 
-static u8 count_active_bolts(void) {
-    u8 i;
-    u8 active = 0;
-    for (i = 0; i < MAX_BOLTS; i++) {
-        if (bolts[i].active) active++;
-    }
-    return active;
-}
-
 static void handle_pickups_and_hits(void) {
     u8 i;
 
@@ -1197,8 +1041,8 @@ static void handle_pickups_and_hits(void) {
         if (stars[i].active && overlap(player.x, player.y, PLAYER_W, player_height(), stars[i].x + 2, stars[i].y + 2, 12, 12)) {
             stars[i].active = 0;
             score += POINT_STAR;
+            starsTowardMinute++;
             activate_star_reward();
-            play_sfx(SFX_STAR);
         }
     }
 
@@ -1209,12 +1053,9 @@ static void handle_pickups_and_hits(void) {
             } else if (powerups[i].type == POWER_LIGHTNING) {
                 player.big = 1;
                 player.lightning = 1;
-            } else if (powerups[i].type == POWER_LIFE) {
-                lives = grant_extra_life(lives, MAX_LIVES);
             }
             powerups[i].active = 0;
-            score += (powerups[i].type == POWER_LIFE) ? POINT_LIFE : 250;
-            play_sfx(SFX_POWERUP);
+            score += 250;
         }
     }
 
@@ -1225,7 +1066,6 @@ static void handle_pickups_and_hits(void) {
                 enemies[i].active = 0;
                 score += POINT_ENEMY;
                 player.vy = -7;
-                play_sfx(SFX_ENEMY_STOMP);
             } else {
                 player_take_hit();
             }
@@ -1246,8 +1086,6 @@ static void handle_pickups_and_hits(void) {
     }
 
     if (player.x >= LEVEL_GOAL_X) {
-        play_sfx(SFX_LEVEL_CLEAR);
-        if (playerMode == PLAYER_MODE_TURN_BASED) save_active_run_state();
         gameState = STATE_LEVEL_CLEAR;
     }
 }
@@ -1268,8 +1106,8 @@ static void sprite_emit(u8 frame, s16 sx, s16 sy, u8 hflip, u8 pal) {
     u16 id;
     if (spriteCount >= 128) return;
     if (sx <= -16 || sx >= SCREEN_W || sy <= -16 || sy >= SCREEN_H) return;
-    id = (u16)spriteCount;
-    oamSet(id, (u16)sx, (u16)sy, 3, hflip, 0, sprite_frame_offset_16x16(frame), pal);
+    id = (u16)spriteCount * 4;
+    oamSet(id, (u16)sx, (u16)sy, 3, hflip, 0, frame_offset(frame), pal);
     oamSetEx(id, OBJ_SMALL, OBJ_SHOW);
     spriteCount++;
 }
@@ -1277,7 +1115,7 @@ static void sprite_emit(u8 frame, s16 sx, s16 sy, u8 hflip, u8 pal) {
 static void sprite_end(void) {
     u16 id;
     while (spriteCount < 128) {
-        id = (u16)spriteCount;
+        id = (u16)spriteCount * 4;
         oamSetVisible(id, OBJ_HIDE);
         spriteCount++;
     }
@@ -1340,10 +1178,8 @@ static void draw_powerups(void) {
     u8 i;
     for (i = 0; i < MAX_POWERUPS; i++) {
         if (powerups[i].active) {
-            u8 frame = SPR_GROW_POWER;
-            if (powerups[i].type == POWER_LIGHTNING) frame = SPR_LIGHT_POWER;
-            if (powerups[i].type == POWER_LIFE) frame = SPR_STAR_SMILE;
-            sprite_emit(frame, powerups[i].x - cameraX, powerups[i].y, 0, 0);
+            sprite_emit(powerups[i].type == POWER_GROW ? SPR_GROW_POWER : SPR_LIGHT_POWER,
+                        powerups[i].x - cameraX, powerups[i].y, 0, 0);
         }
     }
 }
@@ -1364,13 +1200,12 @@ static void draw_ropes(void) {
             s16 dx = ropes[i].x - ropes[i].anchorX;
             s16 dy = ropes[i].y - ropes[i].anchorY;
             s16 seg;
-            sprite_emit(SPR_ROPE_KNOT, ropes[i].anchorX - cameraX - 4, ropes[i].anchorY - 2, 0, 0);
-            for (seg = 0; seg <= 2; seg++) {
-                s16 sx = ropes[i].anchorX + (dx * (seg + 1)) / 4 - cameraX;
-                s16 sy = ropes[i].anchorY + (dy * (seg + 1)) / 4;
-                sprite_emit(SPR_ROPE_SEGMENT, sx - 4, sy, 0, 0);
+            for (seg = 0; seg <= 4; seg++) {
+                s16 sx = ropes[i].anchorX + (dx * seg) / 5 - cameraX - 4;
+                s16 sy = ropes[i].anchorY + (dy * seg) / 5;
+                sprite_emit(SPR_BOLT, sx, sy, 0, 0);
             }
-            sprite_emit(SPR_ROPE_KNOT, ropes[i].x - cameraX - 4, ropes[i].y - 2, 0, 0);
+            sprite_emit(SPR_STAR_SMILE, ropes[i].x - cameraX, ropes[i].y, 0, 0);
         }
     }
 }
@@ -1388,8 +1223,6 @@ static void draw_player(void) {
 
 static void draw_play_hud(void) {
     u16 reserveSeconds = superReserveFrames / 60;
-    u16 reserveMinutes = reserveSeconds / 60;
-    u16 reserveRemainderSeconds = reserveSeconds % 60;
     u8 world = (currentLevel / LEVELS_PER_WORLD) + 1;
     u8 stage = (currentLevel % LEVELS_PER_WORLD) + 1;
     consoleDrawText(0, 0, BLANK_LINE);
@@ -1400,80 +1233,52 @@ static void draw_play_hud(void) {
     consoleDrawText(0, 26, BLANK_LINE);
     consoleDrawText(1, 0, "WORLD %u-%u  %s", world, stage, worldNames[world - 1]);
     consoleDrawText(1, 1, "SCORE %05u", score);
-    consoleDrawText(1, 2, "LIVES %u", lives);
-    consoleDrawText(1, 3, "STARS %03u/100", starsTowardMinute);
-    consoleDrawText(1, 4, "SPEED %02um%02us %s", reserveMinutes, reserveRemainderSeconds, superActive ? "ON " : "OFF");
-    consoleDrawText(1, 5, "FORM  %s", player.lightning ? "LIGHT" : (player.big ? "BIG  " : "SMALL"));
-    consoleDrawText(1, 6, "MODE  %s", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN");
-    if (playerMode == PLAYER_MODE_TURN_BASED) {
-        consoleDrawText(1, 7, "ACTIVE P%u", (u8)(activeTurnPlayer + 1));
-    } else {
-        consoleDrawText(1, 7, "ACTIVE BOTH");
-    }
-    consoleDrawText(1, 26, "B JUMP  Y RUN/BOOST/FIRE");
+    consoleDrawText(1, 2, "STARS %02u/60", starsTowardMinute);
+    consoleDrawText(1, 3, "BOOST %03us %s", reserveSeconds, superActive ? "ON " : "OFF");
+    consoleDrawText(1, 4, "FORM  %s", player.lightning ? "LIGHT" : (player.big ? "BIG  " : "SMALL"));
+    consoleDrawText(1, 26, "B JUMP  A RUN/BOOST/FIRE");
 }
 
 static void draw_title_scene(void) {
-    static const s16 rainbowX[9] = { 34, 54, 74, 94, 114, 134, 154, 174, 194 };
-    static const s16 rainbowY[9] = { 86, 74, 66, 58, 56, 58, 66, 74, 86 };
     s16 x;
-    u8 i;
 
     for (x = 0; x < 16; x++) {
+        sprite_emit(SPR_GROUND, x * 16, 176, 0, 0);
         sprite_emit(SPR_GROUND, x * 16, 192, 0, 0);
     }
 
-    sprite_emit(SPR_GROUND, 8, 156, 0, 0);
-    sprite_emit(SPR_GROUND, 24, 156, 0, 0);
-    sprite_emit(SPR_GROUND, 200, 152, 0, 0);
-    sprite_emit(SPR_GROUND, 216, 152, 0, 0);
-    sprite_emit(SPR_BRICK, 78, 152, 0, 0);
-    sprite_emit(SPR_BRICK, 94, 152, 0, 0);
-    sprite_emit(SPR_BRICK, 110, 152, 0, 0);
-    sprite_emit(SPR_BRICK, 126, 152, 0, 0);
-
-    sprite_emit(SPR_PLAYER_BIG_TOP, 104, 98, 0, 0);
-    sprite_emit(SPR_PLAYER_BIG_BOTTOM, 104, 114, 0, 0);
-    sprite_emit(SPR_GROW_POWER, 52, 118, 0, 0);
-    sprite_emit(SPR_ENEMY_WALKER, 182, 122, 1, 0);
-    sprite_emit(SPR_ENEMY_HOPPER, 36, 162, 0, 0);
-
-    for (i = 0; i < 9; i++) {
-        sprite_emit(SPR_STAR_SMILE, rainbowX[i], rainbowY[i], 0, 0);
-    }
-
-    sprite_emit(SPR_TITLE_ROCKET, 198, 30, 0, 0);
-    sprite_emit(SPR_BOLT, 184, 44, 1, 0);
-    sprite_emit(SPR_BOLT, 170, 56, 1, 0);
-    sprite_emit(SPR_BOLT, 156, 68, 1, 0);
-
-    sprite_emit(SPR_STAR_SMILE, 16, 30, 0, 0);
-    sprite_emit(SPR_STAR_SMILE, 48, 18, 0, 0);
-    sprite_emit(SPR_STAR_SMILE, 96, 24, 0, 0);
-    sprite_emit(SPR_STAR_SMILE, 144, 24, 0, 0);
-    sprite_emit(SPR_STAR_SMILE, 174, 18, 0, 0);
-    sprite_emit(SPR_STAR_SMILE, 218, 52, 0, 0);
-    sprite_emit(SPR_LIGHT_POWER, 20, 52, 0, 0);
-    sprite_emit(SPR_LIGHT_POWER, 220, 18, 0, 0);
+    sprite_emit(SPR_PLAYER_BIG_TOP, 40, 128, 0, 0);
+    sprite_emit(SPR_PLAYER_BIG_BOTTOM, 40, 144, 0, 0);
+    sprite_emit(SPR_ENEMY_WALKER, 164, 160, 1, 0);
+    sprite_emit(SPR_ENEMY_HOPPER, 196, 160, 0, 0);
+    sprite_emit(SPR_GROW_POWER, 92, 128, 0, 0);
+    sprite_emit(SPR_LIGHT_POWER, 220, 128, 0, 0);
+    sprite_emit(SPR_BRICK, 88, 96, 0, 0);
+    sprite_emit(SPR_BRICK, 104, 96, 0, 0);
+    sprite_emit(SPR_BRICK, 120, 96, 0, 0);
+    sprite_emit(SPR_BRICK, 136, 96, 0, 0);
+    sprite_emit(SPR_STAR_SMILE, 96, 64, 0, 0);
+    sprite_emit(SPR_STAR_SMILE, 128, 48, 0, 0);
+    sprite_emit(SPR_STAR_SMILE, 160, 64, 0, 0);
+    sprite_emit(SPR_GROW_POWER, 18, 24, 0, 0);
+    sprite_emit(SPR_LIGHT_POWER, 222, 24, 0, 0);
 }
 
 static void draw_title_screen(void) {
-    consoleDrawText(5, 2, "STAR SPRINT");
-    consoleDrawText(2, 4, "ARCADE COVER ACTION EDITION");
-    consoleDrawText(5, 22, "B JUMP / ROPE RELEASE");
-    consoleDrawText(4, 23, "Y RUN, BOOST, AND LIGHT FIRE");
-    consoleDrawText(3, 24, "COLLECT 100 STARS: +1 MIN SPEED");
-    consoleDrawText(4, 25, "SELECT MODE: %s", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN");
-    consoleDrawText(4, 27, "PRESS START FOR WORLD MAP");
+    consoleDrawText(6, 4, "STARSPRINT");
+    consoleDrawText(3, 7, "A SIDE-SCROLLING PLATFORMER");
+    consoleDrawText(4, 10, "B JUMPS / RELEASES ROPES");
+    consoleDrawText(3, 12, "A RUNS, USES BOOST, AND FIRES");
+    consoleDrawText(4, 14, "DOWN SMASHES BRICKS UNDERFOOT");
+    consoleDrawText(5, 16, "COLLECT 60 STARS FOR");
+    consoleDrawText(7, 17, "1 MINUTE OF BOOST");
+    consoleDrawText(5, 21, "PRESS START FOR MAP");
+    consoleDrawText(3, 24, "12 LEVELS ACROSS 3 WORLDS");
 }
 
 static void update_title_input(void) {
-    u8 startPressed = ((padInput & KEY_START) && !(padPrevInput & KEY_START));
-    u8 aPressed = ((padInput & KEY_A) && !(padPrevInput & KEY_A));
-    u8 selectPressed = ((padInput & KEY_SELECT) && !(padPrevInput & KEY_SELECT));
-    if (selectPressed) {
-        playerMode = (playerMode == PLAYER_MODE_COOP) ? PLAYER_MODE_TURN_BASED : PLAYER_MODE_COOP;
-    }
+    u8 startPressed = ((pad0 & KEY_START) && !(padPrev & KEY_START));
+    u8 aPressed = ((pad0 & KEY_A) && !(padPrev & KEY_A));
     if (startPressed || aPressed) {
         gameState = STATE_WORLD_MAP;
         selectedLevel = highestUnlocked;
@@ -1504,15 +1309,8 @@ static void draw_world_map_scene(void) {
             } else {
                 sprite_emit(SPR_USED_BLOCK, x, y, 0, 0);
             }
-            if ((idx & 1) == 0) {
-                sprite_emit(SPR_STAR_SMILE, x - 6, y - 26, 0, 0);
-            }
         }
     }
-
-    sprite_emit(SPR_TITLE_ROCKET, 212, 26, 0, 0);
-    sprite_emit(SPR_BOLT, 196, 38, 1, 0);
-    sprite_emit(SPR_BOLT, 182, 48, 1, 0);
 
     {
         u8 row = selectedLevel / LEVELS_PER_WORLD;
@@ -1524,10 +1322,10 @@ static void draw_world_map_scene(void) {
 static void draw_world_map(void) {
     u8 row;
     u8 col;
-    consoleDrawText(2, 1, "STAR SPRINT WORLD MAP");
+    consoleDrawText(2, 1, "STARSPRINT WORLD MAP");
     consoleDrawText(2, 2, "D-PAD MOVE  START/A PLAY");
     consoleDrawText(2, 3, "CLEAR LEVELS TO UNLOCK MORE");
-    consoleDrawText(2, 4, "MODE %s  BOOST %03us", playerMode == PLAYER_MODE_COOP ? "COOP" : "TURN", (u16)(superReserveFrames / 60));
+    consoleDrawText(2, 4, "BOOST BANK %03us", (u16)(superReserveFrames / 60));
 
     for (row = 0; row < WORLD_COUNT; row++) {
         u8 y = 7 + row * 6;
@@ -1581,21 +1379,18 @@ static void commit_level_clear(void) {
     } else {
         gameState = STATE_WORLD_MAP;
     }
-    if (playerMode == PLAYER_MODE_TURN_BASED) {
-        activeTurnPlayer = next_turn_player(playerMode, activeTurnPlayer, 1);
-    }
 }
 
 static void update_world_map_input(void) {
     u8 row = selectedLevel / LEVELS_PER_WORLD;
     u8 col = selectedLevel % LEVELS_PER_WORLD;
     u8 newIndex = selectedLevel;
-    u8 startPressed = ((padInput & KEY_START) && !(padPrevInput & KEY_START));
-    u8 aPressed = ((padInput & KEY_A) && !(padPrevInput & KEY_A));
-    u8 leftPressed = ((padInput & KEY_LEFT) && !(padPrevInput & KEY_LEFT));
-    u8 rightPressed = ((padInput & KEY_RIGHT) && !(padPrevInput & KEY_RIGHT));
-    u8 upPressed = ((padInput & KEY_UP) && !(padPrevInput & KEY_UP));
-    u8 downPressed = ((padInput & KEY_DOWN) && !(padPrevInput & KEY_DOWN));
+    u8 startPressed = ((pad0 & KEY_START) && !(padPrev & KEY_START));
+    u8 aPressed = ((pad0 & KEY_A) && !(padPrev & KEY_A));
+    u8 leftPressed = ((pad0 & KEY_LEFT) && !(padPrev & KEY_LEFT));
+    u8 rightPressed = ((pad0 & KEY_RIGHT) && !(padPrev & KEY_RIGHT));
+    u8 upPressed = ((pad0 & KEY_UP) && !(padPrev & KEY_UP));
+    u8 downPressed = ((pad0 & KEY_DOWN) && !(padPrev & KEY_DOWN));
 
     if (leftPressed && col > 0) newIndex = selectedLevel - 1;
     if (rightPressed && col + 1 < LEVELS_PER_WORLD) newIndex = selectedLevel + 1;
@@ -1610,16 +1405,16 @@ static void update_world_map_input(void) {
 }
 
 static void update_level_clear_input(void) {
-    u8 startPressed = ((padInput & KEY_START) && !(padPrevInput & KEY_START));
-    u8 aPressed = ((padInput & KEY_A) && !(padPrevInput & KEY_A));
+    u8 startPressed = ((pad0 & KEY_START) && !(padPrev & KEY_START));
+    u8 aPressed = ((pad0 & KEY_A) && !(padPrev & KEY_A));
     if (startPressed || aPressed) {
         commit_level_clear();
     }
 }
 
 static void update_all_clear_input(void) {
-    u8 startPressed = ((padInput & KEY_START) && !(padPrevInput & KEY_START));
-    u8 aPressed = ((padInput & KEY_A) && !(padPrevInput & KEY_A));
+    u8 startPressed = ((pad0 & KEY_START) && !(padPrev & KEY_START));
+    u8 aPressed = ((pad0 & KEY_A) && !(padPrev & KEY_A));
     if (startPressed || aPressed) {
         selectedLevel = highestUnlocked;
         gameState = STATE_WORLD_MAP;
@@ -1628,64 +1423,47 @@ static void update_all_clear_input(void) {
 
 static void set_backdrop_for_state(u8 state) {
     if (state == STATE_TITLE) {
-        setPaletteColor(0, RGB5(4, 8, 20));
+        setPaletteColor(0, RGB5(27, 26, 18));
     } else if (state == STATE_WORLD_MAP) {
-        setPaletteColor(0, RGB5(8, 14, 22));
+        setPaletteColor(0, RGB5(21, 28, 22));
     } else if (state == STATE_LEVEL_CLEAR) {
-        setPaletteColor(0, RGB5(14, 9, 20));
+        setPaletteColor(0, RGB5(25, 21, 29));
     } else if (state == STATE_ALL_CLEAR) {
-        setPaletteColor(0, RGB5(20, 12, 6));
+        setPaletteColor(0, RGB5(30, 24, 15));
     } else {
-        setPaletteColor(0, RGB5(2, 4, 16));
+        setPaletteColor(0, RGB5(31, 31, 10));
     }
 }
 
 static void init_video(void) {
-    // NOTE: BGAdr is the font tile graphics address, and Adr is the tilemap.
-    // Swapping these two causes text/sprite VRAM corruption on screen.
-    consoleSetTextGfxPtr(TEXT_VRAM_GFX_ADDR);
-    consoleSetTextMapPtr(TEXT_VRAM_MAP_ADDR);
-    consoleSetTextOffset(TEXT_VRAM_OFFSET);
+    consoleSetTextMapPtr(0x6800);
+    consoleSetTextGfxPtr(0x3000);
+    consoleSetTextOffset(0x0100);
     consoleInitText(0, 16 * 2, &tilfont, &palfont);
-    apply_ui_theme(STATE_TITLE);
+    consoleSetTextPal(0, (u8 *)uiTextPal, sizeof(uiTextPal));
 
-    bgSetGfxPtr(0, TEXT_VRAM_GFX_ADDR);
-    bgSetMapPtr(0, TEXT_VRAM_MAP_ADDR, SC_32x32);
+    bgSetGfxPtr(0, 0x3000);
+    bgSetMapPtr(0, 0x6800, SC_32x32);
     setMode(BG_MODE1, 0);
     bgSetDisable(1);
     bgSetDisable(2);
 
-    convert_interleaved_4bpp_to_snes(sprite_tiles, spriteTilesVram, SPRITE_TILES_LEN);
-    oamInitGfxSet((u8 *)spriteTilesVram, SPRITE_TILES_LEN, (u8 *)sprite_pal, SPRITE_PAL_LEN, 0, 0x0000, OBJ_SIZE16_L32);
+    oamInitGfxSet((u8 *)sprite_tiles, SPRITE_TILES_LEN, (u8 *)sprite_pal, SPRITE_PAL_LEN, 0, 0x0000, OBJ_SIZE16_L32);
 
     bgSetScroll(0, 0, 0);
     set_backdrop_for_state(STATE_TITLE);
-    /* Ensure the display exits reset at visible brightness instead of black. */
-    setBrightness(0x0F);
     setScreenOn();
 }
 
 int main(void) {
-    u8 i;
     init_video();
     reset_player_position();
-    lives = PLAYER_START_LIVES;
     player.big = 0;
     player.lightning = 0;
-    for (i = 0; i < 2; i++) {
-        runState[i].score = 0;
-        runState[i].starsTowardMinute = 0;
-        runState[i].superReserveFrames = 0;
-        runState[i].lives = PLAYER_START_LIVES;
-        runState[i].big = 0;
-        runState[i].lightning = 0;
-    }
 
     while (1) {
-        padPrevInput = padInput;
+        padPrev = pad0;
         pad0 = padsCurrent(0);
-        pad1 = padsCurrent(1);
-        padInput = merge_coop_input(pad0, pad1, playerMode, activeTurnPlayer);
 
         if (gameState != lastState) {
             clear_text_screen();
@@ -1694,33 +1472,24 @@ int main(void) {
         }
 
         if (gameState == STATE_TITLE) {
-            apply_ui_theme(gameState);
             update_title_input();
             sprite_begin();
             draw_title_scene();
             sprite_end();
             draw_title_screen();
         } else if (gameState == STATE_PLAY) {
-            u8 simStep;
-            u8 simSteps = 1;
-            apply_ui_theme(gameState);
             if (superActive) {
                 if (superReserveFrames > 0) superReserveFrames--;
                 else superActive = 0;
             }
 
+            update_ropes();
             update_player_input();
-            if (should_run_secondary_substep(player.vx, player.vy, superActive, count_active_bolts())) {
-                simSteps = MAX_PLAY_SUBSTEPS;
-            }
-            for (simStep = 0; simStep < simSteps && gameState == STATE_PLAY; simStep++) {
-                update_ropes();
-                move_player();
-                update_enemies();
-                update_powerups();
-                update_bolts();
-                handle_pickups_and_hits();
-            }
+            move_player();
+            update_enemies();
+            update_powerups();
+            update_bolts();
+            handle_pickups_and_hits();
             update_camera();
 
             sprite_begin();
@@ -1734,20 +1503,17 @@ int main(void) {
             sprite_end();
             draw_play_hud();
         } else if (gameState == STATE_WORLD_MAP) {
-            apply_ui_theme(gameState);
             update_world_map_input();
             sprite_begin();
             draw_world_map_scene();
             sprite_end();
             draw_world_map();
         } else if (gameState == STATE_LEVEL_CLEAR) {
-            apply_ui_theme(gameState);
             update_level_clear_input();
             sprite_begin();
             sprite_end();
             draw_level_clear_screen();
         } else {
-            apply_ui_theme(gameState);
             update_all_clear_input();
             sprite_begin();
             sprite_end();

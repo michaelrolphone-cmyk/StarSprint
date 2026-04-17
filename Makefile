@@ -1,12 +1,10 @@
-ifeq ($(filter test bundle-prebuilt,$(MAKECMDGOALS)),)
 ifeq ($(strip $(PVSNESLIB_HOME)),)
-$(error "Please set PVSNESLIB_HOME to a pvsneslib 4.5.0 checkout: https://github.com/alekmaul/pvsneslib/wiki/Installation")
+$(error "Please create an environment variable PVSNESLIB_HOME by following this guide: https://github.com/alekmaul/pvsneslib/wiki/Installation")
 endif
 
 include ${PVSNESLIB_HOME}/devkitsnes/snes_rules
-endif
 
-.PHONY: all clean test bundle bundle-prebuilt
+.PHONY: all clean
 
 export ROMNAME := starsprint
 SRC := ./src
@@ -18,24 +16,3 @@ OFILES := $(filter-out hdr.obj,$(OFILES))
 all: $(ROMNAME).sfc
 
 clean: cleanBuildRes cleanRom cleanGfx cleanAudio
-
-test:
-	cc -std=c99 -Wall -Wextra -pedantic tests/test_video_layout.c -o tests/test_video_layout
-	./tests/test_video_layout
-	cc -std=c99 -Wall -Wextra -pedantic tests/test_sprite_format.c src/sprite_format.c src/assets.c -o tests/test_sprite_format
-	./tests/test_sprite_format
-	cc -std=c99 -Wall -Wextra -pedantic tests/test_game_logic.c src/game_logic.c -o tests/test_game_logic
-	./tests/test_game_logic
-	./tests/test_bundle_prebuilt.sh
-	./tests/test_console_shim.sh
-	./tests/test_sprite_vram_alias_regression.sh
-	./tests/test_sprite_upload_path_regression.sh
-	./tests/test_boot_brightness_regression.sh
-	./tests/test_pvsneslib_450_api_regression.sh
-
-bundle: all bundle-prebuilt
-
-bundle-prebuilt:
-	@test -f $(ROMNAME).sfc || (echo "Missing $(ROMNAME).sfc. Build first with 'make'." && exit 1)
-	mkdir -p dist
-	cp $(ROMNAME).sfc dist/$(ROMNAME).sfc
